@@ -4,7 +4,7 @@ import type { CreatePersonBody } from '@shared/api.js';
 import { useCreatePerson, usePeople } from '../api/hooks';
 
 export function People() {
-  const { data: people, isPending, isError, error } = usePeople();
+  const { data: people, isPending } = usePeople();
   const createPerson = useCreatePerson();
 
   const [name, setName] = useState('');
@@ -49,7 +49,6 @@ export function People() {
       )}
 
       {isPending && <p>Loading people…</p>}
-      {isError && <p role="alert">Failed to load people: {error.message}</p>}
       {people && people.length === 0 && <p>No people yet.</p>}
       {people && people.length > 0 && (
         <ul className="person-list">

@@ -112,4 +112,18 @@ describe('toTimelineData', () => {
 
     expect(data[0]!.className).toContain('status-pending');
   });
+
+  it('escapes HTML in the content label title (defense-in-depth)', () => {
+    const { data } = toTimelineData([
+      makeItem({
+        title: '<b>bold</b>',
+        date_start: '1943-01-01',
+        date_end: '1943-12-31',
+        date_precision: 'year',
+      }),
+    ]);
+
+    expect(data[0]!.content).toBe('1943 — &lt;b&gt;bold&lt;/b&gt;');
+    expect(data[0]!.content).not.toContain('<b>');
+  });
 });

@@ -1,6 +1,17 @@
 import type { ItemSummary, Precision } from '@shared/api.js';
 import { buildTimelineTooltip } from './tooltip';
 
+// Minimal HTML-escaper for text interpolated into markup vis-timeline renders
+// as HTML (datum `content` and `title`). Shared with tooltip.ts.
+export function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Fixed month names (no Intl) so labels are deterministic across environments.
 const MONTHS = [
   'January',
@@ -56,9 +67,9 @@ export function toTimelineData(items: ItemSummary[]): {
       continue;
     }
 
-    const content = `${formatDateLabel(item.date_start, item.date_precision)} — ${
-      item.title ?? 'Untitled'
-    }`;
+    const content = `${formatDateLabel(item.date_start, item.date_precision)} — ${escapeHtml(
+      item.title ?? 'Untitled',
+    )}`;
     const title = buildTimelineTooltip(item);
     const className = `precision-${item.date_precision} status-${item.status}`;
 

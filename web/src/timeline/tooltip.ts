@@ -1,15 +1,5 @@
 import type { ItemSummary } from '@shared/api.js';
-import { formatDateLabel } from './translate';
-
-// Minimal HTML-escaper for text interpolated into the tooltip markup.
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+import { escapeHtml, formatDateLabel } from './translate';
 
 // Pure builder for the HTML string vis-timeline shows as an item's hover
 // tooltip (the datum `title` property). Shows the item title, its thumbnail,

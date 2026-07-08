@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import type { MediaType } from '@shared/api.js';
+import { API_BASE } from '../api/client';
 import { MediaTypeIcon } from './MediaTypeIcon';
-
-// Same base-URL knob as web/src/api/client.ts.
-const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
 export interface ThumbnailProps {
   itemId: number;

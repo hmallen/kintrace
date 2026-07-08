@@ -29,7 +29,7 @@ export function Library() {
   if (status !== undefined) filters.status = status;
   if (personId !== undefined) filters.personId = personId;
 
-  const { data: items, isPending, isError, error } = useItems(filters);
+  const { data: items, isPending } = useItems(filters);
 
   function setStatusFilter(value: string) {
     const next = new URLSearchParams(searchParams);
@@ -72,7 +72,6 @@ export function Library() {
         </p>
       )}
       {isPending && <p>Loading items…</p>}
-      {isError && <p role="alert">Failed to load items: {error.message}</p>}
       {items && items.length === 0 && <p>No items found.</p>}
       {items && items.length > 0 && (
         <ul className="card-grid">

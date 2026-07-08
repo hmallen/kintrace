@@ -5,11 +5,11 @@ import XHRUpload from '@uppy/xhr-upload';
 import Dashboard from '@uppy/react/dashboard';
 import { ImportResultSchema, MediaTypeSchema } from '@shared/api.js';
 import type { ImportResult, MediaType } from '@shared/api.js';
+import { API_BASE } from '../api/client';
 import { summarizeImport } from '../import/summarize';
 import '@uppy/core/css/style.min.css';
 import '@uppy/dashboard/css/style.min.css';
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 const MEDIA_TYPES = MediaTypeSchema.options;
 
 // Per-file outcomes plus the summary line. Duplicates are informational only

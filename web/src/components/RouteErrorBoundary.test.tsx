@@ -6,6 +6,7 @@ import { http, HttpResponse } from 'msw';
 import type { ItemSummary } from '@shared/api.js';
 import { makeQueryClient } from '../queryClient';
 import { routes } from '../router';
+import { RouteErrorBoundary } from './RouteErrorBoundary';
 import { server } from '../test/msw';
 import { itemsHandler } from '../test/handlers';
 
@@ -83,5 +84,32 @@ describe('RouteErrorBoundary', () => {
       await screen.findByText(/can't reach the kintrace backend on :3271/i),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+  });
+
+  it('render-time exception renders the generic route-level error, not BackendDown', () => {
+    // A component bug that throws during render (NOT a fetch/network failure)
+    // must land on the generic "Something went wrong" UI — BackendDown is
+    // reserved for genuine fetch rejections, so mislabeling this as ":3271
+    // unreachable" would hide the real bug.
+    function Boom(): never {
+      throw new Error('render blew up');
+    }
+    // React logs the caught error to console.error; silence it for this spec.
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(
+      <QueryClientProvider client={makeQueryClient()}>
+        <RouteErrorBoundary>
+          <Boom />
+        </RouteErrorBoundary>
+      </QueryClientProvider>,
+    );
+    spy.mockRestore();
+
+    expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
+    expect(screen.getByText('render blew up')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+    expect(
+      screen.queryByText(/can't reach the kintrace backend/i),
+    ).not.toBeInTheDocument();
   });
 });

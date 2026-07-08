@@ -202,13 +202,12 @@ function WorkspaceContent({ item }: { item: ItemDetail }) {
 export function Workspace() {
   const params = useParams();
   const id = Number(params.id);
-  const { data: item, isPending, isError, error } = useItem(id);
+  const { data: item, isPending } = useItem(id);
 
   return (
     <section>
       <h2>Workspace</h2>
       {isPending && <p>Loading item…</p>}
-      {isError && <p role="alert">Failed to load item: {error.message}</p>}
       {item && <WorkspaceContent key={item.id} item={item} />}
     </section>
   );

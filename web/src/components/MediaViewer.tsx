@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import type { MediaType } from '@shared/api.js';
-
-// Same base-URL knob as web/src/api/client.ts.
-const API_BASE = import.meta.env.VITE_API_BASE ?? '';
+import { API_BASE } from '../api/client';
 
 export interface MediaViewerProps {
   itemId: number;

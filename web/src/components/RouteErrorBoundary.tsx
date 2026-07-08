@@ -1,27 +1,17 @@
 import { Component, type ReactNode } from 'react';
 import { QueryErrorResetBoundary } from '@tanstack/react-query';
-import { ApiError } from '../api/client';
 import { BackendDown } from './BackendDown';
 
 // A route-level error boundary. Top-level queries run with `throwOnError`, so a
 // failed query throws during render and is caught here. We discriminate:
-//   - ApiError (has `.status`) or a Zod parse failure → route-level error UI
-//     with a retry action (never a silently-wrong render).
-//   - anything else — a fetch rejection (TypeError, backend unreachable) → the
-//     full-page BackendDown state.
+//   - a fetch rejection (`TypeError`, what `fetch` throws when the backend is
+//     unreachable) → the full-page BackendDown state.
+//   - everything else — ApiError, a Zod parse failure, or a render-time
+//     exception from a component bug → the route-level error UI with a retry
+//     action (never a silently-wrong render, and never mislabeled ":3271
+//     unreachable").
 // Retry resets the query error state (so the failed query refetches) and clears
 // the boundary so children re-render.
-
-function isZodError(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    (error.name === 'ZodError' || 'issues' in error)
-  );
-}
-
-function isRouteLevelError(error: unknown): boolean {
-  return error instanceof ApiError || isZodError(error);
-}
 
 interface InnerProps {
   children: ReactNode;
@@ -50,7 +40,9 @@ class ErrorBoundaryInner extends Component<InnerProps, InnerState> {
       return this.props.children;
     }
 
-    if (!isRouteLevelError(error)) {
+    // Only a fetch rejection (network-level failure) is BackendDown; every
+    // other error — including a render-time exception — is a route-level error.
+    if (error instanceof TypeError) {
       return <BackendDown onRetry={this.handleRetry} />;
     }
 

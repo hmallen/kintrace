@@ -12,7 +12,9 @@ export class ApiError extends Error {
   }
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? '';
+// Single source of truth for the backend base URL (empty = same origin).
+// Consumed here and by media/thumbnail/upload URL builders elsewhere.
+export const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
 async function request(path: string, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers);
