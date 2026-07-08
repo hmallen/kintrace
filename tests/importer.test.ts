@@ -37,6 +37,8 @@ describe('importFile', () => {
     expect(existsSync(item.file_path)).toBe(true);
     expect(item.file_path.startsWith(dirs.archiveDir)).toBe(true);
     expect(readdirSync(dirs.cacheDir).length).toBe(1); // thumbnail
+    expect(item.thumb_path).not.toBeNull();
+    expect(existsSync(item.thumb_path)).toBe(true);
   });
 
   it('detects duplicates by content hash', async () => {
@@ -56,6 +58,8 @@ describe('importFile', () => {
     const result = await importFile(db, src, { ...dirs, mediaType: 'audio' });
     expect(result.duplicate).toBe(false);
     expect(readdirSync(dirs.cacheDir).length).toBe(0);
+    const item: any = db.prepare('SELECT * FROM items WHERE id = ?').get(result.itemId);
+    expect(item.thumb_path).toBeNull();
   });
 
   it('resolves a concurrent duplicate-import race to a single winner', async () => {

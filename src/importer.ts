@@ -47,7 +47,8 @@ export async function importFile(
   await copyFile(sourcePath, destPath);
 
   try {
-    if (IMAGE_EXTS.has(ext)) {
+    const isImage = IMAGE_EXTS.has(ext);
+    if (isImage) {
       await sharp(destPath)
         .resize({ width: 512, withoutEnlargement: true })
         .jpeg({ quality: 80 })
@@ -55,8 +56,8 @@ export async function importFile(
     }
 
     const info = db
-      .prepare('INSERT INTO items (file_path, content_hash, media_type) VALUES (?, ?, ?)')
-      .run(destPath, hash, opts.mediaType);
+      .prepare('INSERT INTO items (file_path, content_hash, media_type, thumb_path) VALUES (?, ?, ?, ?)')
+      .run(destPath, hash, opts.mediaType, isImage ? thumbPath : null);
     return { itemId: Number(info.lastInsertRowid), duplicate: false };
   } catch (err) {
     // Clean up anything this call created that ended up untracked, whether

@@ -19,7 +19,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   app.get('/api/items', (req) => {
     const { status, personId } = req.query as { status?: string; personId?: string };
     let sql =
-      'SELECT i.id, i.title, i.media_type, i.date_start, i.date_end, i.date_precision, i.status, i.content_hash FROM items i';
+      'SELECT i.id, i.title, i.media_type, i.date_start, i.date_end, i.date_precision, i.status, i.content_hash, i.thumb_path FROM items i';
     const where: string[] = [];
     const params: unknown[] = [];
     if (personId) {
@@ -50,13 +50,21 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
   app.patch('/api/items/:id', (req, reply) => {
     const id = Number((req.params as { id: string }).id);
-    const item = db.prepare('SELECT id FROM items WHERE id = ?').get(id);
+    const item = db.prepare('SELECT id, status FROM items WHERE id = ?').get(id) as
+      | { id: number; status: string }
+      | undefined;
     if (!item) return reply.code(404).send({ error: 'not found' });
     const body = req.body as {
       title?: string; description?: string; transcription?: string;
       date?: { start?: string | null; end?: string | null; precision?: string };
-      status?: 'reviewed';
+      status?: string;
     };
+    if (body.status !== undefined && body.status !== 'reviewed') {
+      return reply.code(400).send({ error: 'invalid status' });
+    }
+    if (body.status === 'reviewed' && item.status === 'pending') {
+      return reply.code(409).send({ error: 'item not transcribed yet' });
+    }
     const sets: string[] = [];
     const params: unknown[] = [];
     for (const field of ['title', 'description', 'transcription'] as const) {
@@ -79,9 +87,21 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     return db.prepare('SELECT * FROM items WHERE id = ?').get(id);
   });
 
+  const ITEM_PEOPLE_ROLES = new Set(['subject', 'author', 'recipient']);
+
   app.post('/api/items/:id/people', (req, reply) => {
     const id = Number((req.params as { id: string }).id);
-    const { personId, role } = req.body as { personId: number; role: string };
+    const { personId, role } = req.body as { personId: unknown; role: unknown };
+    if (typeof personId !== 'number' || !Number.isFinite(personId)) {
+      return reply.code(400).send({ error: 'personId must be a number' });
+    }
+    if (typeof role !== 'string' || !ITEM_PEOPLE_ROLES.has(role)) {
+      return reply.code(400).send({ error: 'role must be one of subject, author, recipient' });
+    }
+    const item = db.prepare('SELECT id FROM items WHERE id = ?').get(id);
+    if (!item) return reply.code(404).send({ error: 'item not found' });
+    const person = db.prepare('SELECT id FROM people WHERE id = ?').get(personId);
+    if (!person) return reply.code(404).send({ error: 'person not found' });
     db.prepare('INSERT OR IGNORE INTO item_people (item_id, person_id, role) VALUES (?, ?, ?)')
       .run(id, personId, role);
     reply.code(204).send();
@@ -96,15 +116,25 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     reply.code(201).send({ id: Number(info.lastInsertRowid), name });
   });
 
-  app.post('/api/import', async (req) => {
-    const { paths, mediaType } = req.body as { paths: string[]; mediaType: MediaType };
+  const MEDIA_TYPES = new Set<MediaType>(['photo', 'letter', 'article', 'audio', 'video', 'pdf']);
+
+  app.post('/api/import', async (req, reply) => {
+    const { paths, mediaType } = req.body as { paths: unknown; mediaType: unknown };
+    if (!Array.isArray(paths) || !paths.every((p) => typeof p === 'string')) {
+      return reply.code(400).send({ error: 'paths must be an array of strings' });
+    }
+    if (typeof mediaType !== 'string' || !MEDIA_TYPES.has(mediaType as MediaType)) {
+      return reply.code(400).send({ error: 'mediaType must be one of photo, letter, article, audio, video, pdf' });
+    }
+    const validPaths = paths as string[];
+    const validMediaType = mediaType as MediaType;
     const results = [];
-    for (const p of paths) {
+    for (const p of validPaths) {
       try {
         const r = await importFile(deps.db, p, {
           archiveDir: deps.archiveDir,
           cacheDir: deps.cacheDir,
-          mediaType,
+          mediaType: validMediaType,
         });
         results.push({ path: p, ...r });
       } catch (e) {

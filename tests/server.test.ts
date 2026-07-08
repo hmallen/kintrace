@@ -66,4 +66,56 @@ describe('REST API', () => {
     expect((await app.inject({ method: 'GET', url: '/api/items/999' })).statusCode).toBe(404);
     expect((await app.inject({ method: 'POST', url: '/api/queue/process' })).statusCode).toBe(503);
   });
+
+  it('includes thumb_path in the items list for an item seeded with one', async () => {
+    const id = Number(
+      db.prepare(
+        "INSERT INTO items (file_path, content_hash, media_type, title, status, thumb_path) VALUES ('/x.jpg', 'hthumb', 'letter', 'A letter', 'transcribed', '/cache/hthumb-thumb.jpg')"
+      ).run().lastInsertRowid
+    );
+    const res = await app.inject({ method: 'GET', url: '/api/items?status=transcribed' });
+    const found = res.json().find((i: any) => i.id === id);
+    expect(found.thumb_path).toBe('/cache/hthumb-thumb.jpg');
+  });
+
+  it('rejects linking with an invalid role (400) and a missing person (404)', async () => {
+    const id = seedItem('h-link');
+    const badRole = await app.inject({
+      method: 'POST', url: `/api/items/${id}/people`, payload: { personId: 1, role: 'friend' },
+    });
+    expect(badRole.statusCode).toBe(400);
+
+    const missingPerson = await app.inject({
+      method: 'POST', url: `/api/items/${id}/people`, payload: { personId: 999999, role: 'author' },
+    });
+    expect(missingPerson.statusCode).toBe(404);
+  });
+
+  it('rejects PATCH to reviewed when the item is still pending, applying no changes', async () => {
+    const id = Number(
+      db.prepare(
+        "INSERT INTO items (file_path, content_hash, media_type, title, status) VALUES ('/x.jpg', 'h-pending', 'letter', 'Original title', 'pending')"
+      ).run().lastInsertRowid
+    );
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/api/items/${id}`,
+      payload: { title: 'New title', status: 'reviewed' },
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: 'item not transcribed yet' });
+    const item: any = db.prepare('SELECT * FROM items WHERE id = ?').get(id);
+    expect(item.title).toBe('Original title');
+    expect(item.status).toBe('pending');
+  });
+
+  it('rejects import with missing paths or a bad mediaType', async () => {
+    const missingPaths = await app.inject({ method: 'POST', url: '/api/import', payload: { mediaType: 'photo' } });
+    expect(missingPaths.statusCode).toBe(400);
+
+    const badMediaType = await app.inject({
+      method: 'POST', url: '/api/import', payload: { paths: ['/a.jpg'], mediaType: 'bogus' },
+    });
+    expect(badMediaType.statusCode).toBe(400);
+  });
 });
