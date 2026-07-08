@@ -5,11 +5,13 @@ import { http, HttpResponse } from 'msw';
 import type { ItemDetail, ItemSummary, Person } from '@shared/api.js';
 import { makeQueryClient } from '../queryClient';
 import { server } from '../test/msw';
+import { ApiError } from './client';
 import {
   useCreatePerson,
   useItems,
   useLinkPerson,
   usePeople,
+  useProcessQueue,
   useUpdateItem,
 } from './hooks';
 
@@ -139,6 +141,61 @@ describe('useCreatePerson', () => {
         { id: 2, name: 'Babbage', notes: null },
       ]),
     );
+  });
+});
+
+describe('useProcessQueue', () => {
+  it('useProcessQueue posts and parses', async () => {
+    let itemsCalls = 0;
+    server.use(
+      http.get('/api/items', () => {
+        itemsCalls += 1;
+        return HttpResponse.json([summary]);
+      }),
+      http.post('/api/queue/process', () =>
+        HttpResponse.json({ processed: 2, failed: 0 }),
+      ),
+    );
+
+    const qc = makeQueryClient();
+    const { result } = renderHook(
+      () => ({ items: useItems({}), process: useProcessQueue() }),
+      { wrapper: wrapperFor(qc) },
+    );
+
+    await waitFor(() => expect(result.current.items.isSuccess).toBe(true));
+    const callsBefore = itemsCalls;
+
+    await act(async () => {
+      await result.current.process.mutateAsync();
+    });
+
+    await waitFor(() =>
+      expect(result.current.process.data).toEqual({ processed: 2, failed: 0 }),
+    );
+    // Success invalidates ['items'], so the mounted items query refetches.
+    await waitFor(() => expect(itemsCalls).toBeGreaterThan(callsBefore));
+  });
+
+  it('503 yields ApiError', async () => {
+    const message = 'AI not configured — set OPENAI_API_KEY or ANTHROPIC_API_KEY';
+    server.use(
+      http.post('/api/queue/process', () =>
+        HttpResponse.json({ error: message }, { status: 503 }),
+      ),
+    );
+
+    const qc = makeQueryClient();
+    const { result } = renderHook(() => useProcessQueue(), { wrapper: wrapperFor(qc) });
+
+    await act(async () => {
+      await expect(result.current.mutateAsync()).rejects.toThrow(message);
+    });
+
+    await waitFor(() => expect(result.current.error).toBeInstanceOf(ApiError));
+    const error = result.current.error;
+    expect(error?.status).toBe(503);
+    expect(error?.serverMessage).toBe(message);
   });
 });
 

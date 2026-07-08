@@ -1,4 +1,5 @@
 import { Link, NavLink, Outlet } from 'react-router-dom';
+import { ProcessQueueButton } from './ProcessQueueButton';
 
 export function AppShell() {
   return (
@@ -21,8 +22,9 @@ export function AppShell() {
           <NavLink to="/import">Import</NavLink>
           <NavLink to="/people">People</NavLink>
         </nav>
-        {/* Header actions slot — the process-queue button lands here in a later task. */}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.75rem' }}>
+        {/* Header actions slot. */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <ProcessQueueButton />
           <Link to="/import">Import media</Link>
         </div>
       </header>

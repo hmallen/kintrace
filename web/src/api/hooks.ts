@@ -10,6 +10,7 @@ import {
   ItemSummarySchema,
   PersonSchema,
   CreatePersonResultSchema,
+  QueueResultSchema,
 } from '@shared/api.js';
 import type {
   ItemSummary,
@@ -19,9 +20,11 @@ import type {
   LinkPersonBody,
   CreatePersonBody,
   CreatePersonResult,
+  QueueResult,
   Status,
 } from '@shared/api.js';
 import { ApiError, apiFetch, apiSend } from './client';
+import { useQueueStore } from '../stores/queue';
 
 export interface ItemFilters {
   status?: Status;
@@ -37,9 +40,13 @@ function itemsPath(filters: ItemFilters): string {
 }
 
 export function useItems(filters: ItemFilters): UseQueryResult<ItemSummary[], ApiError> {
+  // While the queue is being processed (UI flag set by ProcessQueueButton),
+  // poll so item statuses tick over live; stop as soon as the pass settles.
+  const processing = useQueueStore((state) => state.processing);
   return useQuery<ItemSummary[], ApiError>({
     queryKey: ['items', filters],
     queryFn: () => apiFetch(itemsPath(filters), ItemSummarySchema.array()),
+    refetchInterval: () => (processing ? 2000 : false),
   });
 }
 
@@ -125,6 +132,18 @@ export function useLinkPerson(
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['item', itemId] });
+    },
+  });
+}
+
+export function useProcessQueue(): UseMutationResult<QueueResult, ApiError, void> {
+  const queryClient = useQueryClient();
+  return useMutation<QueueResult, ApiError, void>({
+    mutationFn: () =>
+      apiFetch('/api/queue/process', QueueResultSchema, { method: 'POST' }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['items'] });
+      await queryClient.invalidateQueries({ queryKey: ['item'] });
     },
   });
 }
