@@ -42,4 +42,26 @@ describe('transcribeItem', () => {
     await transcribeItem(client, [Buffer.from('img')], 'letter');
     expect(seenPrompt).toMatch(/handwritten|letter/i);
   });
+
+  it('extracts JSON despite a stray brace after it in prose', async () => {
+    const noisy = 'Analysis: ' + goodResponse + ' Note the {handwriting} style.';
+    const result = await transcribeItem(fakeClient(noisy), [Buffer.from('img')], 'letter');
+    expect(result.title).toBe('Letter to Mabel about the harvest');
+  });
+
+  it('extracts JSON despite a stray brace pair before it in prose', async () => {
+    const noisy = 'The {image} shows a letter.\n' + goodResponse;
+    const result = await transcribeItem(fakeClient(noisy), [Buffer.from('img')], 'letter');
+    expect(result.title).toBe('Letter to Mabel about the harvest');
+  });
+
+  it('throws when no braces ever form valid JSON', async () => {
+    await expect(
+      transcribeItem(
+        fakeClient('The {handwriting} is {faded}'),
+        [Buffer.from('img')],
+        'letter'
+      )
+    ).rejects.toThrow(/AI response invalid/);
+  });
 });
