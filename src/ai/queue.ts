@@ -1,6 +1,6 @@
 import sharp from 'sharp';
 import type Database from 'better-sqlite3';
-import { transcribeItem, type VisionClient } from './transcriber.js';
+import type { TranscriptionEngine } from './engine.js';
 import { normalizeFuzzyDate } from '../dates.js';
 
 async function defaultResize(path: string): Promise<Buffer> {
@@ -9,7 +9,7 @@ async function defaultResize(path: string): Promise<Buffer> {
 
 export async function processPendingItems(
   db: Database.Database,
-  client: VisionClient,
+  engine: TranscriptionEngine,
   opts: { resizeForAi?: (path: string) => Promise<Buffer> } = {}
 ): Promise<{ processed: number; failed: number }> {
   const resize = opts.resizeForAi ?? defaultResize;
@@ -28,18 +28,20 @@ export async function processPendingItems(
       const paths = pages.length > 0 ? pages.map((p) => p.file_path) : [item.file_path];
       const images = await Promise.all(paths.map(resize));
 
-      const s = await transcribeItem(client, images, item.media_type);
-      const date = normalizeFuzzyDate(s.date);
+      const result = await engine.transcribe(images, item.media_type);
+      const date = normalizeFuzzyDate(result.date);
 
       db.prepare(
-        `UPDATE items SET transcription = ?, title = ?, description = ?,
+        `UPDATE items SET transcription_diplomatic = ?, transcription_normalized = ?,
+           title = ?, description = ?,
            date_start = ?, date_end = ?, date_precision = ?,
-           ai_names = ?, ai_error = NULL, status = 'transcribed'
+           ai_names = ?, ai_confidence = ?, ai_error = NULL, status = 'transcribed'
          WHERE id = ?`
       ).run(
-        s.transcription, s.title, s.description,
+        result.transcriptionDiplomatic, result.transcriptionNormalized,
+        result.title, result.description,
         date.start, date.end, date.precision,
-        JSON.stringify(s.names), item.id
+        JSON.stringify(result.names), JSON.stringify(result.confidence), item.id
       );
       processed++;
     } catch (e) {

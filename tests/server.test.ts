@@ -7,7 +7,7 @@ let app: ReturnType<typeof buildServer>;
 
 beforeEach(() => {
   db = openDb(':memory:');
-  app = buildServer({ db, archiveDir: '/tmp/na', cacheDir: '/tmp/na', client: null });
+  app = buildServer({ db, archiveDir: '/tmp/na', cacheDir: '/tmp/na', engine: null });
 });
 
 function seedItem(hash = 'h1'): number {
@@ -64,7 +64,93 @@ describe('REST API', () => {
 
   it('returns 404 for missing items and 503 for queue without AI client', async () => {
     expect((await app.inject({ method: 'GET', url: '/api/items/999' })).statusCode).toBe(404);
-    expect((await app.inject({ method: 'POST', url: '/api/queue/process' })).statusCode).toBe(503);
+    const queue = await app.inject({ method: 'POST', url: '/api/queue/process' });
+    expect(queue.statusCode).toBe(503);
+    expect(queue.json()).toEqual({ error: 'AI transcription not configured' });
+  });
+
+  it('returns 503 with the provider-aware message when aiDisabledMessage is set', async () => {
+    const message = 'AI transcription disabled: TRANSCRIBE_PROVIDER=openai but OPENAI_API_KEY is not set';
+    const disabled = buildServer({
+      db, archiveDir: '/tmp/na', cacheDir: '/tmp/na', engine: null, aiDisabledMessage: message,
+    });
+    const res = await disabled.inject({ method: 'POST', url: '/api/queue/process' });
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({ error: message });
+  });
+
+  it('patches the two transcription fields independently and together', async () => {
+    const id = seedItem('h-tr');
+    const dip = await app.inject({
+      method: 'PATCH', url: `/api/items/${id}`,
+      payload: { transcription_diplomatic: 'Dear Mabel, the har-\nvest is in.' },
+    });
+    expect(dip.statusCode).toBe(200);
+    let item: any = db.prepare('SELECT * FROM items WHERE id = ?').get(id);
+    expect(item.transcription_diplomatic).toBe('Dear Mabel, the har-\nvest is in.');
+    expect(item.transcription_normalized).toBeNull();
+
+    const norm = await app.inject({
+      method: 'PATCH', url: `/api/items/${id}`,
+      payload: { transcription_normalized: 'Dear Mabel, the harvest is in.' },
+    });
+    expect(norm.statusCode).toBe(200);
+    item = db.prepare('SELECT * FROM items WHERE id = ?').get(id);
+    expect(item.transcription_normalized).toBe('Dear Mabel, the harvest is in.');
+    expect(item.transcription_diplomatic).toBe('Dear Mabel, the har-\nvest is in.');
+
+    const both = await app.inject({
+      method: 'PATCH', url: `/api/items/${id}`,
+      payload: { transcription_diplomatic: 'D2', transcription_normalized: 'N2' },
+    });
+    expect(both.statusCode).toBe(200);
+    item = db.prepare('SELECT * FROM items WHERE id = ?').get(id);
+    expect(item.transcription_diplomatic).toBe('D2');
+    expect(item.transcription_normalized).toBe('N2');
+  });
+
+  it('rejects a PATCH body containing only ai_confidence (400)', async () => {
+    const id = seedItem('h-conf-patch');
+    const res = await app.inject({
+      method: 'PATCH', url: `/api/items/${id}`,
+      payload: { ai_confidence: { overall: 'high', summary: '', flaggedSpans: [] } },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('returns parsed ai_confidence from GET and PATCH, with ai_names left as a raw JSON string', async () => {
+    const confidence = {
+      overall: 'medium',
+      summary: 'Signature legible on second look.',
+      flaggedSpans: [{ text: 'har-\nvest', reason: 'line-break hyphenation' }],
+    };
+    const id = seedItem('h-conf');
+    db.prepare('UPDATE items SET ai_confidence = ?, ai_names = ? WHERE id = ?')
+      .run(JSON.stringify(confidence), JSON.stringify(['Mabel']), id);
+
+    const got = await app.inject({ method: 'GET', url: `/api/items/${id}` });
+    expect(got.statusCode).toBe(200);
+    expect(got.json().ai_confidence).toEqual(confidence);
+    expect(got.json().ai_names).toBe(JSON.stringify(['Mabel']));
+
+    const patched = await app.inject({
+      method: 'PATCH', url: `/api/items/${id}`, payload: { title: 'Retitled' },
+    });
+    expect(patched.statusCode).toBe(200);
+    expect(patched.json().ai_confidence).toEqual(confidence);
+  });
+
+  it('returns ai_confidence as null when unset and when the column holds unparseable JSON', async () => {
+    const unset = seedItem('h-conf-null');
+    const unsetRes = await app.inject({ method: 'GET', url: `/api/items/${unset}` });
+    expect(unsetRes.statusCode).toBe(200);
+    expect(unsetRes.json().ai_confidence).toBeNull();
+
+    const broken = seedItem('h-conf-broken');
+    db.prepare('UPDATE items SET ai_confidence = ? WHERE id = ?').run('{not json', broken);
+    const brokenRes = await app.inject({ method: 'GET', url: `/api/items/${broken}` });
+    expect(brokenRes.statusCode).toBe(200);
+    expect(brokenRes.json().ai_confidence).toBeNull();
   });
 
   it('includes thumb_path in the items list for an item seeded with one', async () => {

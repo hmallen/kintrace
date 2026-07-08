@@ -3,13 +3,32 @@ import type Database from 'better-sqlite3';
 import { importFile, type MediaType } from './importer.js';
 import { processPendingItems } from './ai/queue.js';
 import { normalizeFuzzyDate } from './dates.js';
-import type { VisionClient } from './ai/transcriber.js';
+import type { TranscriptionEngine } from './ai/engine.js';
 
 export interface ServerDeps {
   db: Database.Database;
   archiveDir: string;
   cacheDir: string;
-  client: VisionClient | null;
+  engine: TranscriptionEngine | null;
+  aiDisabledMessage?: string;
+}
+
+/**
+ * Maps an items row to its API shape: `ai_confidence` is parsed into an
+ * object (null when unset or unparseable — the latter shouldn't happen, the
+ * queue zod-gates it before writing). `ai_names` stays a raw JSON string
+ * (frontend contract).
+ */
+function toItemResponse(row: Record<string, unknown>): Record<string, unknown> {
+  let aiConfidence: unknown = null;
+  if (typeof row.ai_confidence === 'string') {
+    try {
+      aiConfidence = JSON.parse(row.ai_confidence);
+    } catch {
+      aiConfidence = null;
+    }
+  }
+  return { ...row, ai_confidence: aiConfidence };
 }
 
 export function buildServer(deps: ServerDeps): FastifyInstance {
@@ -45,7 +64,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
         'SELECT p.id, p.name, ip.role FROM item_people ip JOIN people p ON p.id = ip.person_id WHERE ip.item_id = ?'
       )
       .all(id);
-    return { ...item, people };
+    return { ...toItemResponse(item as Record<string, unknown>), people };
   });
 
   app.patch('/api/items/:id', (req, reply) => {
@@ -55,13 +74,14 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       | undefined;
     if (!item) return reply.code(404).send({ error: 'not found' });
     const body = (req.body ?? {}) as {
-      title?: string; description?: string; transcription?: string;
+      title?: string; description?: string;
+      transcription_diplomatic?: string; transcription_normalized?: string;
       date?: { start?: string | null; end?: string | null; precision?: string };
       status?: string;
     };
-    const hasKnownField = ['title', 'description', 'transcription', 'date', 'status'].some(
-      (f) => (body as Record<string, unknown>)[f] !== undefined
-    );
+    const hasKnownField = [
+      'title', 'description', 'transcription_diplomatic', 'transcription_normalized', 'date', 'status',
+    ].some((f) => (body as Record<string, unknown>)[f] !== undefined);
     if (!hasKnownField) {
       return reply.code(400).send({ error: 'request body required' });
     }
@@ -73,7 +93,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     }
     const sets: string[] = [];
     const params: unknown[] = [];
-    for (const field of ['title', 'description', 'transcription'] as const) {
+    for (const field of ['title', 'description', 'transcription_diplomatic', 'transcription_normalized'] as const) {
       if (body[field] !== undefined) {
         sets.push(`${field} = ?`);
         params.push(body[field]);
@@ -90,7 +110,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     if (sets.length) {
       db.prepare(`UPDATE items SET ${sets.join(', ')} WHERE id = ?`).run(...params, id);
     }
-    return db.prepare('SELECT * FROM items WHERE id = ?').get(id);
+    const updated = db.prepare('SELECT * FROM items WHERE id = ?').get(id);
+    return toItemResponse(updated as Record<string, unknown>);
   });
 
   const ITEM_PEOPLE_ROLES = new Set(['subject', 'author', 'recipient']);
@@ -151,8 +172,10 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   });
 
   app.post('/api/queue/process', async (_req, reply) => {
-    if (!deps.client) return reply.code(503).send({ error: 'AI client not configured (set ANTHROPIC_API_KEY)' });
-    return processPendingItems(deps.db, deps.client);
+    if (!deps.engine) {
+      return reply.code(503).send({ error: deps.aiDisabledMessage ?? 'AI transcription not configured' });
+    }
+    return processPendingItems(deps.db, deps.engine);
   });
 
   return app;
