@@ -1,5 +1,11 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import fastifyMultipart from '@fastify/multipart';
 import type Database from 'better-sqlite3';
+import { randomBytes } from 'node:crypto';
+import fs from 'node:fs';
+import { mkdir, rm } from 'node:fs/promises';
+import path from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import { importFile, type MediaType } from './importer.js';
 import { processPendingItems } from './ai/queue.js';
 import { normalizeFuzzyDate } from './dates.js';
@@ -9,6 +15,7 @@ export interface ServerDeps {
   db: Database.Database;
   archiveDir: string;
   cacheDir: string;
+  stagingDir: string;
   engine: TranscriptionEngine | null;
   aiDisabledMessage?: string;
 }
@@ -31,9 +38,36 @@ function toItemResponse(row: Record<string, unknown>): Record<string, unknown> {
   return { ...row, ai_confidence: aiConfidence };
 }
 
+const EXTENSION_CONTENT_TYPES: Record<string, string> = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.tif': 'image/tiff',
+  '.tiff': 'image/tiff',
+  '.webp': 'image/webp',
+  '.pdf': 'application/pdf',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.mp4': 'video/mp4',
+  '.mov': 'video/quicktime',
+  '.webm': 'video/webm',
+};
+
 export function buildServer(deps: ServerDeps): FastifyInstance {
   const { db } = deps;
   const app = Fastify();
+  // Without an explicit fileSize the plugin caps files at Fastify's bodyLimit
+  // (1 MiB) — far below a typical archival scan. Uploads stream to disk, so no
+  // cap is imposed here.
+  app.register(fastifyMultipart, { limits: { fileSize: Infinity } });
+
+  function itemPeople(itemId: number): unknown[] {
+    return db
+      .prepare(
+        'SELECT p.id, p.name, ip.role FROM item_people ip JOIN people p ON p.id = ip.person_id WHERE ip.item_id = ?'
+      )
+      .all(itemId);
+  }
 
   app.get('/api/items', (req) => {
     const { status, personId } = req.query as { status?: string; personId?: string };
@@ -59,12 +93,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     const id = Number((req.params as { id: string }).id);
     const item = db.prepare('SELECT * FROM items WHERE id = ?').get(id);
     if (!item) return reply.code(404).send({ error: 'not found' });
-    const people = db
-      .prepare(
-        'SELECT p.id, p.name, ip.role FROM item_people ip JOIN people p ON p.id = ip.person_id WHERE ip.item_id = ?'
-      )
-      .all(id);
-    return { ...toItemResponse(item as Record<string, unknown>), people };
+    return { ...toItemResponse(item as Record<string, unknown>), people: itemPeople(id) };
   });
 
   app.patch('/api/items/:id', (req, reply) => {
@@ -111,7 +140,34 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       db.prepare(`UPDATE items SET ${sets.join(', ')} WHERE id = ?`).run(...params, id);
     }
     const updated = db.prepare('SELECT * FROM items WHERE id = ?').get(id);
-    return toItemResponse(updated as Record<string, unknown>);
+    return { ...toItemResponse(updated as Record<string, unknown>), people: itemPeople(id) };
+  });
+
+  app.get('/api/items/:id/thumbnail', (req, reply) => {
+    const id = Number((req.params as { id: string }).id);
+    const item = db.prepare('SELECT thumb_path FROM items WHERE id = ?').get(id) as
+      | { thumb_path: string | null }
+      | undefined;
+    if (!item || !item.thumb_path || !fs.existsSync(item.thumb_path)) {
+      return reply.code(404).send({ error: 'not found' });
+    }
+    return reply.type('image/jpeg').send(fs.createReadStream(item.thumb_path));
+  });
+
+  app.get('/api/items/:id/file', (req, reply) => {
+    const id = Number((req.params as { id: string }).id);
+    const item = db.prepare('SELECT file_path FROM items WHERE id = ?').get(id) as
+      | { file_path: string | null }
+      | undefined;
+    if (!item || !item.file_path || !fs.existsSync(item.file_path)) {
+      return reply.code(404).send({ error: 'not found' });
+    }
+    const ext = path.extname(item.file_path).toLowerCase();
+    const contentType = EXTENSION_CONTENT_TYPES[ext] ?? 'application/octet-stream';
+    return reply
+      .type(contentType)
+      .header('Content-Disposition', 'inline')
+      .send(fs.createReadStream(item.file_path));
   });
 
   const ITEM_PEOPLE_ROLES = new Set(['subject', 'author', 'recipient']);
@@ -169,6 +225,52 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       }
     }
     return results;
+  });
+
+  app.post('/api/upload', async (req, reply) => {
+    await mkdir(deps.stagingDir, { recursive: true });
+    // Stage every file part as it streams in (mediaType may arrive after the
+    // files, so imports run only once all parts are consumed).
+    const staged: { filename: string; stagedPath: string }[] = [];
+    let mediaType: unknown;
+    try {
+      for await (const part of req.parts()) {
+        if (part.type === 'file') {
+          const unique = randomBytes(8).toString('hex');
+          const stagedPath = path.join(
+            deps.stagingDir,
+            `${unique}-${path.basename(part.filename)}`
+          );
+          await pipeline(part.file, fs.createWriteStream(stagedPath));
+          staged.push({ filename: part.filename, stagedPath });
+        } else if (part.fieldname === 'mediaType') {
+          mediaType = part.value;
+        }
+      }
+      if (typeof mediaType !== 'string' || !MEDIA_TYPES.has(mediaType as MediaType)) {
+        // Return (not reply.send) so the finally-block cleanup completes
+        // before Fastify serializes the response.
+        reply.code(400);
+        return { error: 'mediaType must be one of photo, letter, article, audio, video, pdf' };
+      }
+      const validMediaType = mediaType as MediaType;
+      const results = [];
+      for (const { filename, stagedPath } of staged) {
+        try {
+          const r = await importFile(deps.db, stagedPath, {
+            archiveDir: deps.archiveDir,
+            cacheDir: deps.cacheDir,
+            mediaType: validMediaType,
+          });
+          results.push({ path: filename, ...r });
+        } catch (e) {
+          results.push({ path: filename, error: (e as Error).message });
+        }
+      }
+      return results;
+    } finally {
+      await Promise.all(staged.map(({ stagedPath }) => rm(stagedPath, { force: true })));
+    }
   });
 
   app.post('/api/queue/process', async (_req, reply) => {

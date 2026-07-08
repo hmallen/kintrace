@@ -1,0 +1,49 @@
+/*
+ * KinTrace design tokens — "the archivist's desk".
+ *
+ * Two-tone surface system: the app backdrop is the desk (warm, slightly
+ * deep); content sits on paper sheets; scans are matted near-white so they
+ * read as prints laid on the desk. One accent — deep oxblood — for links,
+ * the active nav item, primary actions, and focus. Status hues are
+ * functional encoding (pending / transcribed / reviewed), not accents.
+ *
+ * All text/surface pairs below meet WCAG AA (most AAA); verified ratios:
+ * ink/paper 14.3, ink-soft/paper 7.1, oxblood/paper 10.0, status hues ≥6.8.
+ * No dark mode — deferred by the spec.
+ */
+
+:root {
+  /* Surfaces */
+  --kt-desk: #efe7d6; /* app backdrop — the desk itself */
+  --kt-paper: #fbf7ee; /* sheets: cards, panels, header */
+  --kt-mat: #fffdf8; /* print mat behind scans — nearly white */
+
+  /* Ink */
+  --kt-ink: #2a241e; /* warm charcoal, primary text */
+  --kt-ink-soft: #5c5346; /* secondary text, labels */
+  --kt-rule: #d8cdb6; /* hairline rules and card edges */
+
+  /* Accent — the one and only */
+  --kt-accent: #6e2431; /* deep oxblood */
+  --kt-accent-deep: #571c27; /* hover/active */
+  --kt-accent-wash: #f1e3dc; /* faint wash for hover fills */
+
+  /* Status encoding (shared by chips + timeline shapes) */
+  --kt-status-pending: #7a4a0e; /* ochre — untouched, needs transcription */
+  --kt-status-transcribed: #3e5574; /* slate ink — machine-read, unverified */
+  --kt-status-reviewed: #33603e; /* bottle green — human-verified */
+  --kt-danger: #8c2626; /* errors */
+
+  /* Type */
+  --kt-font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --kt-font-ui:
+    ui-sans-serif, system-ui, 'Segoe UI', Helvetica, Arial, sans-serif;
+
+  /* Shape + shadow */
+  --kt-radius: 4px;
+  --kt-shadow-card: 0 1px 2px rgba(42, 36, 30, 0.1), 0 4px 12px rgba(42, 36, 30, 0.07);
+  --kt-shadow-card-hover:
+    0 1px 2px rgba(42, 36, 30, 0.12), 0 8px 20px rgba(42, 36, 30, 0.12);
+  --kt-shadow-print:
+    0 1px 2px rgba(42, 36, 30, 0.16), 0 10px 28px rgba(42, 36, 30, 0.14);
+}
