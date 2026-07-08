@@ -1,11 +1,8 @@
 import { createBrowserRouter, type RouteObject } from 'react-router-dom';
-import { App } from './App';
+import { AppShell } from './components/AppShell';
+import { Library } from './routes/Library';
 
 // Placeholder route components — real pages land in later tasks.
-function Library() {
-  return <p>Library</p>;
-}
-
 function Workspace() {
   return <p>Workspace</p>;
 }
@@ -25,7 +22,7 @@ function People() {
 export const routes: RouteObject[] = [
   {
     path: '/',
-    element: <App />,
+    element: <AppShell />,
     children: [
       { index: true, element: <Library /> },
       { path: 'items/:id', element: <Workspace /> },
