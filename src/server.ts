@@ -1,7 +1,11 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import fastifyMultipart from '@fastify/multipart';
 import type Database from 'better-sqlite3';
+import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
+import { mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import { importFile, type MediaType } from './importer.js';
 import { processPendingItems } from './ai/queue.js';
 import { normalizeFuzzyDate } from './dates.js';
@@ -11,6 +15,7 @@ export interface ServerDeps {
   db: Database.Database;
   archiveDir: string;
   cacheDir: string;
+  stagingDir: string;
   engine: TranscriptionEngine | null;
   aiDisabledMessage?: string;
 }
@@ -51,6 +56,10 @@ const EXTENSION_CONTENT_TYPES: Record<string, string> = {
 export function buildServer(deps: ServerDeps): FastifyInstance {
   const { db } = deps;
   const app = Fastify();
+  // Without an explicit fileSize the plugin caps files at Fastify's bodyLimit
+  // (1 MiB) — far below a typical archival scan. Uploads stream to disk, so no
+  // cap is imposed here.
+  app.register(fastifyMultipart, { limits: { fileSize: Infinity } });
 
   function itemPeople(itemId: number): unknown[] {
     return db
@@ -216,6 +225,52 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       }
     }
     return results;
+  });
+
+  app.post('/api/upload', async (req, reply) => {
+    await mkdir(deps.stagingDir, { recursive: true });
+    // Stage every file part as it streams in (mediaType may arrive after the
+    // files, so imports run only once all parts are consumed).
+    const staged: { filename: string; stagedPath: string }[] = [];
+    let mediaType: unknown;
+    try {
+      for await (const part of req.parts()) {
+        if (part.type === 'file') {
+          const unique = randomBytes(8).toString('hex');
+          const stagedPath = path.join(
+            deps.stagingDir,
+            `${unique}-${path.basename(part.filename)}`
+          );
+          await pipeline(part.file, fs.createWriteStream(stagedPath));
+          staged.push({ filename: part.filename, stagedPath });
+        } else if (part.fieldname === 'mediaType') {
+          mediaType = part.value;
+        }
+      }
+      if (typeof mediaType !== 'string' || !MEDIA_TYPES.has(mediaType as MediaType)) {
+        // Return (not reply.send) so the finally-block cleanup completes
+        // before Fastify serializes the response.
+        reply.code(400);
+        return { error: 'mediaType must be one of photo, letter, article, audio, video, pdf' };
+      }
+      const validMediaType = mediaType as MediaType;
+      const results = [];
+      for (const { filename, stagedPath } of staged) {
+        try {
+          const r = await importFile(deps.db, stagedPath, {
+            archiveDir: deps.archiveDir,
+            cacheDir: deps.cacheDir,
+            mediaType: validMediaType,
+          });
+          results.push({ path: filename, ...r });
+        } catch (e) {
+          results.push({ path: filename, error: (e as Error).message });
+        }
+      }
+      return results;
+    } finally {
+      await Promise.all(staged.map(({ stagedPath }) => rm(stagedPath, { force: true })));
+    }
   });
 
   app.post('/api/queue/process', async (_req, reply) => {
