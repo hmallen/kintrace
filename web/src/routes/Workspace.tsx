@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,8 +6,12 @@ import { z } from 'zod';
 import { PrecisionSchema } from '@shared/api.js';
 import type { ItemDetail, PatchItemBody } from '@shared/api.js';
 import { useItem, useUpdateItem } from '../api/hooks';
+import { FlagsSidebar } from '../review/FlagsSidebar';
+import {
+  TranscriptionEditor,
+  type TranscriptionEditorHandle,
+} from '../review/TranscriptionEditor';
 import { ConfidenceBanner } from '../components/ConfidenceBanner';
-import { FlaggedSpansList } from '../components/FlaggedSpansList';
 import { MediaViewer } from '../components/MediaViewer';
 import { MetadataForm } from '../components/MetadataForm';
 import { PeoplePanel } from '../components/PeoplePanel';
@@ -69,10 +73,18 @@ const TAB_FIELD = {
   normalized: 'transcription_normalized',
 } as const;
 
-function TranscriptionTabs({ form }: { form: UseFormReturn<WorkspaceFormValues> }) {
+function TranscriptionTabs({
+  form,
+  flaggedSpans,
+}: {
+  form: UseFormReturn<WorkspaceFormValues>;
+  flaggedSpans: { text: string; reason: string }[];
+}) {
   const [tab, setTab] = useState<Tab>('diplomatic');
+  const editorRef = useRef<TranscriptionEditorHandle>(null);
   const field = TAB_FIELD[tab];
   const value = form.watch(field);
+  const diplomaticValue = form.watch('transcription_diplomatic');
 
   return (
     <section>
@@ -101,14 +113,24 @@ function TranscriptionTabs({ form }: { form: UseFormReturn<WorkspaceFormValues> 
           </button>
         </p>
       ) : (
-        <textarea
-          aria-label={`${tab === 'diplomatic' ? 'Diplomatic' : 'Normalized'} transcription`}
+        <TranscriptionEditor
+          key={tab}
+          ref={editorRef}
+          label={`${tab === 'diplomatic' ? 'Diplomatic' : 'Normalized'} transcription`}
           value={value}
-          onChange={(e) => form.setValue(field, e.target.value, { shouldDirty: true })}
-          rows={12}
-          style={{ width: '100%', fontFamily: 'monospace' }}
+          onChange={(next) => form.setValue(field, next, { shouldDirty: true })}
+          // Flagged spans quote diplomatic text; the normalized editor gets none.
+          flaggedSpans={tab === 'diplomatic' ? flaggedSpans : []}
         />
       )}
+      <FlagsSidebar
+        spans={flaggedSpans}
+        value={diplomaticValue ?? ''}
+        onSpanClick={(text) => {
+          // Span offsets only make sense in the diplomatic text.
+          if (tab === 'diplomatic') editorRef.current?.selectSpan(text);
+        }}
+      />
     </section>
   );
 }
@@ -141,8 +163,10 @@ function WorkspaceContent({ item }: { item: ItemDetail }) {
         </p>
         <ConfidenceBanner confidence={item.ai_confidence} aiError={item.ai_error} />
         <form onSubmit={(e) => void form.handleSubmit(onSave)(e)}>
-          <TranscriptionTabs form={form} />
-          <FlaggedSpansList spans={item.ai_confidence?.flaggedSpans ?? []} />
+          <TranscriptionTabs
+            form={form}
+            flaggedSpans={item.ai_confidence?.flaggedSpans ?? []}
+          />
           <MetadataForm control={form.control} register={form.register} />
           <button type="submit" disabled={saveMutation.isPending}>
             Save

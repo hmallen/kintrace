@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { EditorView } from '@codemirror/view';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
@@ -124,6 +125,13 @@ async function settled(qc: ReturnType<typeof makeQueryClient>) {
   });
 }
 
+// The transcription textbox is a CodeMirror editor (contenteditable), so its
+// value lives in the editor state rather than a form value attribute.
+function editorValue(name: RegExp): string {
+  const dom = screen.getByRole('textbox', { name });
+  return EditorView.findFromDOM(dom)?.state.doc.toString() ?? '';
+}
+
 async function loadWorkspace(item: ItemDetail, people: Person[] = []) {
   const scenario = setupItemScenario(item, people);
   const rendered = renderAt(`/items/${item.id}`);
@@ -139,13 +147,9 @@ describe('Workspace', () => {
     expect(screen.getByText(/Some words are hard to read/)).toBeInTheDocument();
 
     // Diplomatic is the default tab.
-    expect(
-      screen.getByRole('textbox', { name: /diplomatic transcription/i }),
-    ).toHaveValue('Dear famly [?]\nI am well');
+    expect(editorValue(/diplomatic transcription/i)).toBe('Dear famly [?]\nI am well');
     await userEvent.click(screen.getByRole('tab', { name: 'Normalized' }));
-    expect(
-      screen.getByRole('textbox', { name: /normalized transcription/i }),
-    ).toHaveValue('Dear family, I am well.');
+    expect(editorValue(/normalized transcription/i)).toBe('Dear family, I am well.');
 
     // Flagged span text + reason are listed.
     expect(screen.getByText('famly [?]')).toBeInTheDocument();
@@ -155,18 +159,14 @@ describe('Workspace', () => {
   it('tab toggle switches transcription', async () => {
     await loadWorkspace(baseItem);
 
-    expect(
-      screen.getByRole('textbox', { name: /diplomatic transcription/i }),
-    ).toHaveValue('Dear famly [?]\nI am well');
+    expect(editorValue(/diplomatic transcription/i)).toBe('Dear famly [?]\nI am well');
     expect(
       screen.queryByRole('textbox', { name: /normalized transcription/i }),
     ).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('tab', { name: 'Normalized' }));
 
-    expect(
-      screen.getByRole('textbox', { name: /normalized transcription/i }),
-    ).toHaveValue('Dear family, I am well.');
+    expect(editorValue(/normalized transcription/i)).toBe('Dear family, I am well.');
   });
 
   it('save sends only changed fields', async () => {
@@ -310,6 +310,7 @@ describe('Workspace', () => {
 
     expect(
       screen.getByRole('textbox', { name: /diplomatic transcription/i }),
-    ).toHaveValue('');
+    ).toBeInTheDocument();
+    expect(editorValue(/diplomatic transcription/i)).toBe('');
   });
 });
