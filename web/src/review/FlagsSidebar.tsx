@@ -12,8 +12,8 @@ export function FlagsSidebar({ spans, value, onSpanClick }: FlagsSidebarProps) {
 
   return (
     <section aria-label="Flagged spans">
-      <h3 style={{ fontSize: '1rem' }}>Flagged spans</h3>
-      <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
+      <h3>Flagged spans</h3>
+      <ul style={{ listStyle: 'none', paddingLeft: 0, marginTop: 0 }}>
         {spans.map((span, i) => {
           const resolved = isSpanResolved(value, span.text);
           return (
@@ -28,6 +28,7 @@ export function FlagsSidebar({ spans, value, onSpanClick }: FlagsSidebarProps) {
                   padding: '0.125rem 0',
                   cursor: 'pointer',
                   textAlign: 'left',
+                  // Inline because resolution state is per-item and asserted in tests.
                   textDecoration: resolved ? 'line-through' : 'none',
                   opacity: resolved ? 0.6 : 1,
                 }}

@@ -64,7 +64,7 @@ export function PeoplePanel({ item }: { item: ItemDetail }) {
 
   return (
     <section>
-      <h3 style={{ fontSize: '1rem' }}>People</h3>
+      <h3>People</h3>
       <div data-testid="people-chips">
         {ROLES.map((r) => {
           const members = item.people.filter((p) => p.role === r);
@@ -73,23 +73,14 @@ export function PeoplePanel({ item }: { item: ItemDetail }) {
             <p key={r} style={{ margin: '0.25rem 0' }}>
               <strong>{r}:</strong>{' '}
               {members.map((p) => (
-                <span
-                  key={`${p.id}-${p.role}`}
-                  style={{
-                    display: 'inline-block',
-                    padding: '0 0.5em',
-                    marginRight: '0.25em',
-                    borderRadius: '1em',
-                    border: '1px solid #888',
-                  }}
-                >
+                <span key={`${p.id}-${p.role}`} className="person-chip">
                   {p.name}
                 </span>
               ))}
             </p>
           );
         })}
-        {item.people.length === 0 && <p style={{ color: '#777' }}>No people linked.</p>}
+        {item.people.length === 0 && <p className="hint">No people linked.</p>}
       </div>
 
       {suggestions.length > 0 && (
@@ -103,15 +94,7 @@ export function PeoplePanel({ item }: { item: ItemDetail }) {
               title="AI-suggested name — click to create and link as subject"
               onClick={() => handleSuggestion(name)}
               disabled={createPerson.isPending || linkPerson.isPending}
-              style={{
-                padding: '0 0.5em',
-                marginRight: '0.25em',
-                borderRadius: '1em',
-                border: '1px dashed #888',
-                background: 'transparent',
-                fontStyle: 'italic',
-                cursor: 'pointer',
-              }}
+              className="suggestion-chip"
             >
               {name} +
             </button>
@@ -120,7 +103,7 @@ export function PeoplePanel({ item }: { item: ItemDetail }) {
       )}
 
       {suggestionError && (
-        <p role="alert" style={{ margin: '0.25rem 0', color: '#b00' }}>
+        <p role="alert" style={{ margin: '0.25rem 0' }}>
           {suggestionError}
         </p>
       )}

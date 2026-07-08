@@ -6,36 +6,63 @@
  * includes the companion .vis-dot element — so everything here composes with
  * vis-timeline's own classes.
  *
- * Colors are deliberately quiet/neutral; the warm archival palette lands in
- * Task 21 and only needs to retune the --kt-item-color values below.
+ * Hues come from the archival status tokens in theme.css, shared with the
+ * status chips so the encoding reads the same everywhere.
  */
+
+/* The axis itself sits on the desk; quiet warm rules. */
+.vis-timeline {
+  border-color: var(--kt-rule);
+  background: var(--kt-paper);
+  font-family: var(--kt-font-ui);
+}
+
+.vis-panel.vis-center,
+.vis-panel.vis-left,
+.vis-panel.vis-right,
+.vis-panel.vis-top,
+.vis-panel.vis-bottom {
+  border-color: var(--kt-rule);
+}
+
+.vis-time-axis .vis-text {
+  color: var(--kt-ink-soft);
+}
+
+.vis-time-axis .vis-grid.vis-minor,
+.vis-time-axis .vis-grid.vis-major {
+  border-color: color-mix(in srgb, var(--kt-rule) 60%, transparent);
+}
 
 /* ---- Status tints ------------------------------------------------------ */
 /* Each status sets the hue the precision shapes draw with, so status and
    precision compose freely (any precision × any status). */
 
 .vis-item {
-  --kt-item-color: #8a8a8a; /* fallback if no status class present */
+  --kt-item-color: var(--kt-ink-soft); /* fallback if no status class present */
   color: inherit;
+  font-size: 0.8rem;
 }
 
 .vis-item.status-pending {
-  --kt-item-color: #b0790f; /* amber — untouched, needs transcription */
+  --kt-item-color: var(--kt-status-pending); /* ochre — needs transcription */
 }
 
 .vis-item.status-transcribed {
-  --kt-item-color: #4f6fae; /* slate blue — machine-read, unverified */
+  --kt-item-color: var(--kt-status-transcribed); /* slate ink — unverified */
 }
 
 .vis-item.status-reviewed {
-  --kt-item-color: #4d7a52; /* muted green — human-verified */
+  --kt-item-color: var(--kt-status-reviewed); /* bottle green — verified */
 }
 
 /* ---- Precision shapes -------------------------------------------------- */
 
-/* exact → point marker: a solid dot in the status hue. */
+/* exact → point marker: a filled dot in the status hue (was a hollow ring —
+   too faint against the desk). */
 .vis-item.vis-dot.precision-exact {
   border-color: var(--kt-item-color);
+  background: var(--kt-item-color);
 }
 
 .vis-item.vis-point.precision-exact {
@@ -43,18 +70,18 @@
   border: none;
 }
 
-/* month / year → range bar: solid center, gradient-faded left/right edges.
-   The fade lives in the background gradient (not an element mask) so the
-   honest formatDateLabel text stays fully legible. */
+/* month / year → range bar: solid ink center (label set in paper so it stays
+   legible on the fill), gradient-faded left/right edges expressing the fuzz. */
 .vis-item.vis-range.precision-month,
 .vis-item.vis-range.precision-year {
   border: none;
   border-radius: 3px;
+  color: var(--kt-paper);
   background: linear-gradient(
     to right,
     transparent,
-    color-mix(in srgb, var(--kt-item-color) 55%, transparent) 14px,
-    color-mix(in srgb, var(--kt-item-color) 55%, transparent) calc(100% - 14px),
+    var(--kt-item-color) 14px,
+    var(--kt-item-color) calc(100% - 14px),
     transparent
   );
 }
@@ -75,15 +102,15 @@
 /* ---- Undated tray ------------------------------------------------------ */
 
 .undated-tray {
-  margin-top: 1rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px dashed #bbb;
-  border-radius: 4px;
+  margin-top: 1.25rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px dashed var(--kt-rule);
+  border-radius: var(--kt-radius);
+  background: color-mix(in srgb, var(--kt-paper) 55%, transparent);
 }
 
 .undated-tray h3 {
   margin: 0 0 0.5rem;
-  font-size: 0.9rem;
 }
 
 .undated-tray ul {
@@ -97,9 +124,15 @@
 
 .undated-tray a {
   display: inline-block;
-  padding: 0.25rem 0.5rem;
-  border: 1px solid #ccc;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--kt-rule);
   border-radius: 3px;
-  color: inherit;
+  background: var(--kt-paper);
+  color: var(--kt-ink);
   text-decoration: none;
+}
+
+.undated-tray a:hover {
+  border-color: var(--kt-accent);
+  color: var(--kt-accent);
 }

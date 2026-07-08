@@ -50,17 +50,19 @@ export function Library() {
   return (
     <section>
       <h2>Library</h2>
-      <label>
-        Status{' '}
-        <select value={status ?? ''} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="">all</option>
-          {STATUS_OPTIONS.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="filter-bar">
+        <label>
+          Status{' '}
+          <select value={status ?? ''} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">all</option>
+            {STATUS_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
       {personId !== undefined && (
         <p>
           Filtered by person #{personId}{' '}
@@ -73,36 +75,20 @@ export function Library() {
       {isError && <p role="alert">Failed to load items: {error.message}</p>}
       {items && items.length === 0 && <p>No items found.</p>}
       {items && items.length > 0 && (
-        <ul
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-            gap: '1rem',
-            listStyle: 'none',
-            padding: 0,
-          }}
-        >
+        <ul className="card-grid">
           {items.map((item) => {
             const title = item.title ?? 'Untitled';
             return (
               <li key={item.id}>
-                <Link
-                  to={`/items/${item.id}`}
-                  style={{
-                    display: 'block',
-                    border: '1px solid #ccc',
-                    borderRadius: '4px',
-                    padding: '0.5rem',
-                    color: 'inherit',
-                    textDecoration: 'none',
-                  }}
-                >
+                <Link to={`/items/${item.id}`} className="item-card">
                   <Thumbnail itemId={item.id} alt={title} mediaType={item.media_type} />
-                  <p style={{ fontWeight: 'bold' }}>{title}</p>
-                  <p>
+                  <p className="item-card-title">{title}</p>
+                  <p className="item-card-meta">
                     <StatusChip status={item.status} /> <MediaTypeIcon type={item.media_type} />
                   </p>
-                  <p>{formatDateLabel(item.date_start, item.date_precision)}</p>
+                  <p className="item-card-date">
+                    {formatDateLabel(item.date_start, item.date_precision)}
+                  </p>
                 </Link>
               </li>
             );

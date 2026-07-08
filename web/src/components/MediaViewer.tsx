@@ -21,7 +21,7 @@ export function MediaViewer({ itemId, alt, mediaType }: MediaViewerProps) {
       return <ImageViewer src={src} alt={alt} />;
     case 'audio':
       return (
-        <figure style={{ margin: 0 }}>
+        <figure style={{ margin: 0 }} className="print-frame">
           <audio controls src={src} aria-label={alt}>
             Your browser does not support audio playback.
           </audio>
@@ -29,7 +29,7 @@ export function MediaViewer({ itemId, alt, mediaType }: MediaViewerProps) {
       );
     case 'video':
       return (
-        <figure style={{ margin: 0 }}>
+        <figure style={{ margin: 0 }} className="print-frame">
           <video controls src={src} aria-label={alt} style={{ maxWidth: '100%', maxHeight: '80vh' }}>
             Your browser does not support video playback.
           </video>
@@ -37,7 +37,7 @@ export function MediaViewer({ itemId, alt, mediaType }: MediaViewerProps) {
       );
     case 'pdf':
       return (
-        <figure style={{ margin: 0 }}>
+        <figure style={{ margin: 0 }} className="print-frame">
           <iframe src={src} title={alt} style={{ width: '100%', height: '80vh', border: 0 }} />
         </figure>
       );
@@ -58,16 +58,20 @@ function ImageViewer({ src, alt }: { src: string; alt: string }) {
 
   return (
     <figure style={{ margin: 0 }}>
-      <div style={{ marginBottom: '0.5rem' }}>
+      <div className="viewer-controls">
         <button type="button" onClick={() => setZoom((z) => Math.max(0.25, z / 1.25))}>
           Zoom out
-        </button>{' '}
+        </button>
         <button type="button" onClick={() => setZoom((z) => Math.min(4, z * 1.25))}>
           Zoom in
         </button>
       </div>
-      <div style={{ overflow: 'auto', maxHeight: '80vh' }}>
-        <img src={src} alt={alt} style={{ width: `${zoom * 100}%` }} />
+      {/* The scan sits on a near-white mat with a print shadow — a photograph
+          laid on the desk, not a UI panel. */}
+      <div className="print-frame">
+        <div className="print-scroll">
+          <img src={src} alt={alt} style={{ width: `${zoom * 100}%` }} />
+        </div>
       </div>
     </figure>
   );

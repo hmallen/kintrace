@@ -17,17 +17,7 @@ export function Thumbnail({ itemId, alt, mediaType }: ThumbnailProps) {
 
   if (failed) {
     return (
-      <span
-        data-testid="thumbnail-fallback"
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: '100%',
-          aspectRatio: '4 / 3',
-          background: '#eee',
-        }}
-      >
+      <span data-testid="thumbnail-fallback" className="thumb-fallback">
         <MediaTypeIcon type={mediaType} />
       </span>
     );
@@ -38,7 +28,7 @@ export function Thumbnail({ itemId, alt, mediaType }: ThumbnailProps) {
       src={`${API_BASE}/api/items/${itemId}/thumbnail`}
       alt={alt}
       onError={() => setFailed(true)}
-      style={{ width: '100%', aspectRatio: '4 / 3', objectFit: 'cover' }}
+      className="thumb"
     />
   );
 }

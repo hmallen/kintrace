@@ -31,7 +31,7 @@ export function People() {
     <section>
       <h2>People</h2>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="filter-bar">
         <label>
           Name{' '}
           <input value={name} onChange={(e) => setName(e.target.value)} required />
@@ -52,12 +52,12 @@ export function People() {
       {isError && <p role="alert">Failed to load people: {error.message}</p>}
       {people && people.length === 0 && <p>No people yet.</p>}
       {people && people.length > 0 && (
-        <ul style={{ listStyle: 'none', padding: 0 }}>
+        <ul className="person-list">
           {people.map((person) => (
-            <li key={person.id} style={{ margin: '0.5rem 0' }}>
+            <li key={person.id}>
               <Link to={`/?personId=${person.id}`}>{person.name}</Link>
               {person.notes !== null && person.notes !== '' && (
-                <p style={{ margin: '0.25rem 0', color: '#555' }}>{person.notes}</p>
+                <p className="person-notes">{person.notes}</p>
               )}
             </li>
           ))}

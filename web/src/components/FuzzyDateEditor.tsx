@@ -61,7 +61,7 @@ export function FuzzyDateEditor({ value, onChange }: FuzzyDateEditorProps) {
           ))}
         </select>
       </label>
-      <p data-testid="date-preview" style={{ margin: '0.25rem 0', color: '#555' }}>
+      <p data-testid="date-preview" className="hint" style={{ margin: '0.25rem 0' }}>
         {previewText(normalized)}
       </p>
     </fieldset>

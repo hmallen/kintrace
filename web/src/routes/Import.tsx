@@ -93,19 +93,21 @@ export function Import() {
   return (
     <section>
       <h2>Import</h2>
-      <label>
-        Media type{' '}
-        <select
-          value={mediaType}
-          onChange={(e) => setMediaType(MediaTypeSchema.parse(e.target.value))}
-        >
-          {MEDIA_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {type}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="import-controls">
+        <label>
+          Media type{' '}
+          <select
+            value={mediaType}
+            onChange={(e) => setMediaType(MediaTypeSchema.parse(e.target.value))}
+          >
+            {MEDIA_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
       {uppy && <Dashboard uppy={uppy} />}
       {responseError && <p role="alert">{responseError}</p>}
       <ImportResults results={results} />

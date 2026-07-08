@@ -1,24 +1,7 @@
 import type { Status } from '@shared/api.js';
 
-const COLORS: Record<Status, string> = {
-  pending: '#92400e',
-  transcribed: '#1e40af',
-  reviewed: '#166534',
-};
-
+// Catalog-stamp status marker; hues come from the status tokens in theme.css
+// (shared with the timeline's precision shapes).
 export function StatusChip({ status }: { status: Status }) {
-  return (
-    <span
-      style={{
-        display: 'inline-block',
-        padding: '0 0.5em',
-        borderRadius: '1em',
-        border: `1px solid ${COLORS[status]}`,
-        color: COLORS[status],
-        fontSize: '0.75rem',
-      }}
-    >
-      {status}
-    </span>
-  );
+  return <span className={`status-chip status-${status}`}>{status}</span>;
 }

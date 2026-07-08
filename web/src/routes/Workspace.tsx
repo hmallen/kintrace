@@ -88,7 +88,7 @@ function TranscriptionTabs({
 
   return (
     <section>
-      <div role="tablist" aria-label="Transcription">
+      <div role="tablist" aria-label="Transcription" className="tablist">
         {TABS.map((t) => (
           <button
             key={t}
@@ -96,7 +96,6 @@ function TranscriptionTabs({
             role="tab"
             aria-selected={tab === t}
             onClick={() => setTab(t)}
-            style={{ fontWeight: tab === t ? 'bold' : 'normal' }}
           >
             {t === 'diplomatic' ? 'Diplomatic' : 'Normalized'}
           </button>
@@ -153,11 +152,11 @@ function WorkspaceContent({ item }: { item: ItemDetail }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
-      <div style={{ flex: '1 1 320px', minWidth: '280px' }}>
+    <div className="workspace">
+      <div className="workspace-media">
         <MediaViewer itemId={item.id} alt={item.title ?? 'Item media'} mediaType={item.media_type} />
       </div>
-      <div style={{ flex: '1 1 400px', minWidth: '320px' }}>
+      <div className="workspace-review">
         <p>
           <StatusChip status={item.status} />
         </p>
@@ -168,7 +167,7 @@ function WorkspaceContent({ item }: { item: ItemDetail }) {
             flaggedSpans={item.ai_confidence?.flaggedSpans ?? []}
           />
           <MetadataForm control={form.control} register={form.register} />
-          <button type="submit" disabled={saveMutation.isPending}>
+          <button type="submit" className="btn-primary" disabled={saveMutation.isPending}>
             Save
           </button>
           {saveMutation.isError && (
@@ -185,7 +184,7 @@ function WorkspaceContent({ item }: { item: ItemDetail }) {
             Mark reviewed
           </button>
           {(pending || approve409) && (
-            <span style={{ marginLeft: '0.5rem', color: '#92400e' }}>
+            <span style={{ marginLeft: '0.5rem', color: 'var(--kt-status-pending)' }}>
               item hasn&apos;t been transcribed yet
             </span>
           )}

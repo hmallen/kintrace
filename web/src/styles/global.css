@@ -1,0 +1,505 @@
+/*
+ * Global styles — element defaults + shared component classes.
+ * Tokens live in theme.css. Fraunces is self-hosted via @fontsource
+ * (imported in main.tsx); no CDN requests anywhere.
+ */
+
+/* ---- Base --------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--kt-desk);
+  /* Faint top-lit falloff so the desk reads as a surface, not a flat fill. */
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 253, 248, 0.55),
+    rgba(255, 253, 248, 0) 320px
+  );
+  color: var(--kt-ink);
+  font-family: var(--kt-font-ui);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+legend {
+  font-family: var(--kt-font-display);
+  font-weight: 600;
+  color: var(--kt-ink);
+}
+
+h2 {
+  font-size: 1.65rem;
+  letter-spacing: -0.01em;
+  margin: 0 0 1rem;
+}
+
+/* Section labels read like catalog stamps: small, spaced, quiet. */
+h3 {
+  font-family: var(--kt-font-ui);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--kt-ink-soft);
+  margin: 1.25rem 0 0.5rem;
+}
+
+a {
+  color: var(--kt-accent);
+  text-decoration-color: color-mix(in srgb, var(--kt-accent) 35%, transparent);
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  color: var(--kt-accent-deep);
+  text-decoration-color: currentColor;
+}
+
+p {
+  margin: 0.5rem 0;
+}
+
+/* ---- Controls ----------------------------------------------------------- */
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: 0.875rem;
+  color: var(--kt-ink);
+}
+
+input,
+select,
+textarea {
+  background: var(--kt-mat);
+  border: 1px solid var(--kt-rule);
+  border-radius: var(--kt-radius);
+  padding: 0.3rem 0.5rem;
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background: var(--kt-desk);
+  color: var(--kt-ink-soft);
+}
+
+button {
+  background: var(--kt-paper);
+  border: 1px solid var(--kt-ink-soft);
+  border-radius: var(--kt-radius);
+  padding: 0.3rem 0.85rem;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+button:hover:not(:disabled) {
+  background: var(--kt-accent-wash);
+  border-color: var(--kt-accent);
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* Primary action — the one place a button wears the accent. */
+.btn-primary {
+  background: var(--kt-accent);
+  border-color: var(--kt-accent);
+  color: var(--kt-paper);
+  font-weight: 600;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--kt-accent-deep);
+  border-color: var(--kt-accent-deep);
+  color: var(--kt-paper);
+}
+
+:focus-visible {
+  outline: 2px solid var(--kt-accent);
+  outline-offset: 2px;
+}
+
+label {
+  color: var(--kt-ink-soft);
+  font-size: 0.875rem;
+}
+
+[role='alert'] {
+  color: var(--kt-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ---- App shell ---------------------------------------------------------- */
+
+.masthead {
+  display: flex;
+  align-items: baseline;
+  gap: 2rem;
+  padding: 0.85rem 2rem;
+  background: var(--kt-paper);
+  border-bottom: 1px solid var(--kt-rule);
+  box-shadow: 0 1px 0 rgba(42, 36, 30, 0.04);
+}
+
+.masthead h1 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+
+.masthead-nav {
+  display: flex;
+  gap: 1.25rem;
+}
+
+.masthead-nav a {
+  color: var(--kt-ink-soft);
+  text-decoration: none;
+  font-size: 0.875rem;
+  padding-bottom: 0.15rem;
+  border-bottom: 2px solid transparent;
+}
+
+.masthead-nav a:hover {
+  color: var(--kt-ink);
+}
+
+.masthead-nav a.active {
+  color: var(--kt-accent);
+  border-bottom-color: var(--kt-accent);
+}
+
+.masthead-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.page {
+  max-width: 80rem;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+/* ---- Catalog stamps: status + confidence + media type ------------------- */
+
+.status-chip,
+.confidence-badge {
+  display: inline-block;
+  padding: 0.05em 0.6em;
+  border-radius: 2px;
+  border: 1px solid;
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.status-chip.status-pending {
+  color: var(--kt-status-pending);
+  border-color: color-mix(in srgb, var(--kt-status-pending) 55%, transparent);
+}
+
+.status-chip.status-transcribed {
+  color: var(--kt-status-transcribed);
+  border-color: color-mix(in srgb, var(--kt-status-transcribed) 55%, transparent);
+}
+
+.status-chip.status-reviewed {
+  color: var(--kt-status-reviewed);
+  border-color: color-mix(in srgb, var(--kt-status-reviewed) 55%, transparent);
+}
+
+.confidence-badge.confidence-high {
+  color: var(--kt-status-reviewed);
+  border-color: color-mix(in srgb, var(--kt-status-reviewed) 55%, transparent);
+}
+
+.confidence-badge.confidence-medium {
+  color: var(--kt-status-pending);
+  border-color: color-mix(in srgb, var(--kt-status-pending) 55%, transparent);
+}
+
+.confidence-badge.confidence-low {
+  color: var(--kt-danger);
+  border-color: color-mix(in srgb, var(--kt-danger) 55%, transparent);
+}
+
+.media-type-icon {
+  display: inline-block;
+  padding: 0 0.4em;
+  border: 1px solid var(--kt-rule);
+  border-radius: 2px;
+  font-size: 0.65rem;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  color: var(--kt-ink-soft);
+  background: var(--kt-mat);
+}
+
+/* ---- Library ------------------------------------------------------------ */
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 1.5rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.item-card {
+  display: block;
+  background: var(--kt-paper);
+  border: 1px solid var(--kt-rule);
+  border-radius: var(--kt-radius);
+  padding: 0.75rem;
+  color: inherit;
+  text-decoration: none;
+  box-shadow: var(--kt-shadow-card);
+  transition: box-shadow 140ms ease, transform 140ms ease;
+}
+
+.item-card:hover {
+  color: inherit;
+  box-shadow: var(--kt-shadow-card-hover);
+  transform: translateY(-1px);
+}
+
+.item-card .thumb,
+.item-card .thumb-fallback {
+  border: 1px solid var(--kt-rule);
+  border-radius: 2px;
+  background: var(--kt-mat);
+}
+
+.item-card-title {
+  font-family: var(--kt-font-display);
+  font-weight: 500;
+  font-size: 1.02rem;
+  margin: 0.6rem 0 0.35rem;
+}
+
+.item-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.25rem 0;
+}
+
+.item-card-date {
+  font-size: 0.8rem;
+  color: var(--kt-ink-soft);
+  margin: 0.25rem 0 0;
+}
+
+.thumb {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+}
+
+.thumb-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: var(--kt-desk);
+}
+
+/* ---- Workspace ---------------------------------------------------------- */
+
+.workspace {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+.workspace-media {
+  flex: 1 1 340px;
+  min-width: 280px;
+}
+
+.workspace-review {
+  flex: 1 1 420px;
+  min-width: 320px;
+  background: var(--kt-paper);
+  border: 1px solid var(--kt-rule);
+  border-radius: var(--kt-radius);
+  box-shadow: var(--kt-shadow-card);
+  padding: 1.25rem 1.5rem;
+}
+
+/* Scans presented like prints on the desk: near-white mat, layered shadow. */
+.print-frame {
+  background: var(--kt-mat);
+  border: 1px solid var(--kt-rule);
+  padding: 0.9rem;
+  box-shadow: var(--kt-shadow-print);
+  border-radius: 2px;
+}
+
+.print-frame img,
+.print-frame video,
+.print-frame iframe {
+  display: block;
+}
+
+.viewer-controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.print-scroll {
+  overflow: auto;
+  max-height: 80vh;
+}
+
+.hint {
+  color: var(--kt-ink-soft);
+  font-size: 0.85rem;
+}
+
+.tablist button {
+  border: none;
+  background: none;
+  border-radius: 0;
+  padding: 0.25rem 0.1rem;
+  margin-right: 1.1rem;
+  font-size: 0.875rem;
+  color: var(--kt-ink-soft);
+  border-bottom: 2px solid transparent;
+}
+
+.tablist button:hover:not(:disabled) {
+  background: none;
+  color: var(--kt-ink);
+}
+
+.tablist button[aria-selected='true'] {
+  color: var(--kt-accent);
+  font-weight: 600;
+  border-bottom-color: var(--kt-accent);
+}
+
+/* The transcription sheet itself. */
+.cm-editor {
+  background: var(--kt-mat);
+  border: 1px solid var(--kt-rule);
+  border-radius: var(--kt-radius);
+  font-size: 0.9rem;
+  min-height: 6rem;
+}
+
+.cm-editor .cm-content {
+  padding: 0.6rem 0.2rem;
+}
+
+.cm-editor.cm-focused {
+  outline: 2px solid var(--kt-accent);
+  outline-offset: 1px;
+}
+
+/* People chips — linked people as quiet stamps, suggestions dashed. */
+.person-chip {
+  display: inline-block;
+  padding: 0 0.6em;
+  margin-right: 0.3em;
+  border-radius: 2px;
+  border: 1px solid var(--kt-rule);
+  background: var(--kt-mat);
+  font-size: 0.85rem;
+}
+
+.suggestion-chip {
+  padding: 0 0.6em;
+  margin-right: 0.3em;
+  border-radius: 2px;
+  border: 1px dashed color-mix(in srgb, var(--kt-accent) 55%, transparent);
+  background: transparent;
+  color: var(--kt-accent);
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+/* ---- Import ------------------------------------------------------------- */
+
+.import-controls {
+  margin-bottom: 1rem;
+}
+
+/* Tune Uppy's dashboard to sit on the desk without fighting its layout. */
+.uppy-Dashboard-inner {
+  background: var(--kt-paper);
+  border: 1px solid var(--kt-rule);
+  box-shadow: var(--kt-shadow-card);
+}
+
+.uppy-Dashboard-AddFiles {
+  border-color: var(--kt-rule);
+}
+
+/* ---- People route ------------------------------------------------------- */
+
+.person-list {
+  list-style: none;
+  padding: 0;
+  margin: 1.25rem 0 0;
+  max-width: 40rem;
+}
+
+.person-list > li {
+  background: var(--kt-paper);
+  border: 1px solid var(--kt-rule);
+  border-radius: var(--kt-radius);
+  box-shadow: var(--kt-shadow-card);
+  padding: 0.6rem 1rem;
+  margin: 0.6rem 0;
+}
+
+.person-notes {
+  margin: 0.2rem 0 0;
+  color: var(--kt-ink-soft);
+  font-size: 0.85rem;
+}
