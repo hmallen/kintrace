@@ -112,7 +112,25 @@ describe('Library', () => {
   });
 
   it('card click navigates to workspace', async () => {
-    server.use(itemsHandler(items));
+    server.use(
+      itemsHandler(items),
+      // Stub the target item so the Workspace renders on arrival (top-level
+      // query errors now surface in the route boundary, not inline).
+      http.get('/api/items/1', () =>
+        HttpResponse.json({
+          ...items[0],
+          file_path: 'archive/ha/hash1.jpg',
+          created_at: '2026-07-01T00:00:00Z',
+          description: null,
+          transcription_diplomatic: null,
+          transcription_normalized: null,
+          ai_error: null,
+          ai_names: null,
+          ai_confidence: null,
+          people: [],
+        }),
+      ),
+    );
     const router = renderAt('/');
 
     await userEvent.click(
