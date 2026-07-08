@@ -22,8 +22,9 @@ export function ImportResults({ results }: { results: ImportResult[] }) {
     <section aria-label="Import results">
       <p>{summary.line}</p>
       <ul>
-        {results.map((result) => (
-          <li key={result.path}>
+        {results.map((result, index) => (
+          // Composite key: two files in one batch can share a filename.
+          <li key={`${index}-${result.path}`}>
             {'error' in result ? (
               <>
                 {result.path} — {result.error}
