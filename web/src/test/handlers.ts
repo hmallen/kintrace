@@ -1,5 +1,11 @@
 import { http, HttpResponse } from 'msw';
-import type { ImportResult, ItemDetail, ItemSummary, QueueResult } from '@shared/api.js';
+import type {
+  ImportResult,
+  ItemDetail,
+  ItemSummary,
+  Person,
+  QueueResult,
+} from '@shared/api.js';
 
 // GET /api/items handler that filters by the `status` query param, like the
 // real backend. (`personId` filtering needs link data a summary doesn't carry,
@@ -28,6 +34,11 @@ export function queueProcessHandler(result: QueueResult) {
   return http.post('/api/queue/process', () => HttpResponse.json(result));
 }
 
+// GET /api/people handler serving a fixed people list.
+export function peopleHandler(people: Person[]) {
+  return http.get('/api/people', () => HttpResponse.json(people));
+}
+
 // Relative base paths — MSW intercepts the same relative URLs apiFetch builds.
 export const handlers = [
   itemsHandler([]),
@@ -38,5 +49,5 @@ export const handlers = [
   http.get('/api/items/:id', () =>
     HttpResponse.json({ error: 'item not found' }, { status: 404 }),
   ),
-  http.get('/api/people', () => HttpResponse.json([])),
+  peopleHandler([]),
 ];

@@ -2,13 +2,9 @@ import { createBrowserRouter, type RouteObject } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { Import } from './routes/Import';
 import { Library } from './routes/Library';
+import { People } from './routes/People';
 import { Timeline } from './routes/Timeline';
 import { Workspace } from './routes/Workspace';
-
-// Placeholder route component — the real page lands in a later task.
-function People() {
-  return <p>People</p>;
-}
 
 export const routes: RouteObject[] = [
   {
