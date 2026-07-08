@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { PersonRoleSchema } from '@shared/api.js';
 import type { ItemDetail, PersonRole } from '@shared/api.js';
 import { useCreatePerson, useLinkPerson, usePeople } from '../api/hooks';
@@ -15,13 +15,28 @@ export function PeoplePanel({ item }: { item: ItemDetail }) {
   const [personId, setPersonId] = useState('');
   const [role, setRole] = useState<PersonRole>('subject');
   const [newName, setNewName] = useState('');
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
+  // Names that were created but not yet linked (a create-ok/link-failed chip
+  // click): normalized name → created personId. Reused on retry so we resume at
+  // the link step instead of creating a duplicate person.
+  const createdIds = useRef(new Map<string, number>());
 
   async function handleSuggestion(name: string) {
+    const key = name.trim().toLowerCase();
+    setSuggestionError(null);
     try {
-      const person = await createPerson.mutateAsync({ name });
-      await linkPerson.mutateAsync({ personId: person.id, role: 'subject' });
-    } catch {
-      // surfaced via mutation errors below
+      let id = createdIds.current.get(key);
+      if (id === undefined) {
+        const person = await createPerson.mutateAsync({ name });
+        id = person.id;
+        createdIds.current.set(key, id);
+      }
+      await linkPerson.mutateAsync({ personId: id, role: 'subject' });
+      createdIds.current.delete(key);
+    } catch (err) {
+      setSuggestionError(
+        `Couldn't add ${name}: ${err instanceof Error ? err.message : 'unknown error'}`,
+      );
     }
   }
 
@@ -101,6 +116,12 @@ export function PeoplePanel({ item }: { item: ItemDetail }) {
               {name} +
             </button>
           ))}
+        </p>
+      )}
+
+      {suggestionError && (
+        <p role="alert" style={{ margin: '0.25rem 0', color: '#b00' }}>
+          {suggestionError}
         </p>
       )}
 

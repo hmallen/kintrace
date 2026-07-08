@@ -318,6 +318,45 @@ describe('Workspace', () => {
     await settled(qc);
   });
 
+  it('chip create ok but link fails: surfaces error and reuses person on retry', async () => {
+    const created: unknown[] = [];
+    const links: LinkPersonBody[] = [];
+    const item = { ...baseItem, ai_names: '["Mabel"]' };
+
+    server.use(
+      http.get(`/api/items/${item.id}`, () => HttpResponse.json(item)),
+      http.get('/api/people', () => HttpResponse.json([])),
+      http.post('/api/people', async ({ request }) => {
+        const body = (await request.json()) as { name: string };
+        created.push(body);
+        return HttpResponse.json({ id: 100, name: body.name }, { status: 201 });
+      }),
+      http.post(`/api/items/${item.id}/people`, async ({ request }) => {
+        const body = (await request.json()) as LinkPersonBody;
+        links.push(body);
+        return HttpResponse.json({ error: 'link failed' }, { status: 500 });
+      }),
+    );
+
+    const { qc } = renderAt(`/items/${item.id}`);
+    await screen.findByRole('button', { name: 'Save' });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Add Mabel as subject' }));
+
+    // Failure is surfaced for the suggestion flow.
+    expect(await screen.findByText(/Couldn't add Mabel/)).toBeInTheDocument();
+    await waitFor(() => expect(created).toHaveLength(1));
+    await waitFor(() => expect(links).toHaveLength(1));
+
+    // Retry: no duplicate person created; link is retried with the created id.
+    await userEvent.click(screen.getByRole('button', { name: 'Add Mabel as subject' }));
+
+    await waitFor(() => expect(links).toHaveLength(2));
+    expect(created).toHaveLength(1);
+    expect(links[1]).toEqual({ personId: 100, role: 'subject' });
+    await settled(qc);
+  });
+
   it('already-linked name not suggested', async () => {
     await loadWorkspace({
       ...baseItem,
