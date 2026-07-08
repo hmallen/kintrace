@@ -1,12 +1,9 @@
 import { createBrowserRouter, type RouteObject } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { Library } from './routes/Library';
+import { Workspace } from './routes/Workspace';
 
 // Placeholder route components — real pages land in later tasks.
-function Workspace() {
-  return <p>Workspace</p>;
-}
-
 function Timeline() {
   return <p>Timeline</p>;
 }
