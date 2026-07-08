@@ -1,4 +1,5 @@
 import type { ItemSummary, Precision } from '@shared/api.js';
+import { buildTimelineTooltip } from './tooltip';
 
 // Fixed month names (no Intl) so labels are deterministic across environments.
 const MONTHS = [
@@ -34,6 +35,7 @@ export function formatDateLabel(dateStart: string | null, precision: Precision):
 export interface TimelineDatum {
   id: number;
   content: string; // formatDateLabel + title
+  title: string; // buildTimelineTooltip HTML — vis renders it as the hover tooltip
   start: string; // date_start (ISO)
   end?: string; // date_end for ranges (month/year/decade)
   type: 'point' | 'range'; // exact -> point; month/year/decade -> range
@@ -57,14 +59,16 @@ export function toTimelineData(items: ItemSummary[]): {
     const content = `${formatDateLabel(item.date_start, item.date_precision)} — ${
       item.title ?? 'Untitled'
     }`;
+    const title = buildTimelineTooltip(item);
     const className = `precision-${item.date_precision} status-${item.status}`;
 
     if (item.date_precision === 'exact') {
-      data.push({ id: item.id, content, start: item.date_start, type: 'point', className });
+      data.push({ id: item.id, content, title, start: item.date_start, type: 'point', className });
     } else {
       data.push({
         id: item.id,
         content,
+        title,
         start: item.date_start,
         end: item.date_end ?? item.date_start,
         type: 'range',

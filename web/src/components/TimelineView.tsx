@@ -7,9 +7,19 @@ import type { TimelineDatum } from '../timeline/translate';
 // Thin React wrapper owning the vis-timeline lifecycle: create on mount,
 // setItems on data change, destroy on unmount. All translation logic lives in
 // the pure toTimelineData — this component just hands its output to vis.
-export function TimelineView({ data }: { data: TimelineDatum[] }) {
+export function TimelineView({
+  data,
+  onSelectItem,
+}: {
+  data: TimelineDatum[];
+  onSelectItem?: (id: number) => void;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<Timeline | null>(null);
+  // Ref keeps the vis handler (registered once, on mount) pointed at the
+  // latest callback without re-creating the timeline.
+  const onSelectItemRef = useRef(onSelectItem);
+  onSelectItemRef.current = onSelectItem;
 
   useEffect(() => {
     if (containerRef.current === null) return undefined;
@@ -17,7 +27,14 @@ export function TimelineView({ data }: { data: TimelineDatum[] }) {
     // so construction failures are tolerated — the translation unit is the
     // tested surface, and the container stays in the DOM either way.
     try {
-      timelineRef.current = new Timeline(containerRef.current, [], {});
+      const timeline = new Timeline(containerRef.current, [], {});
+      // vis fires 'select' with the clicked/tapped item ids (empty on
+      // deselect). Datum ids are the numeric item ids from toTimelineData.
+      timeline.on('select', (props?: { items?: Array<string | number> }) => {
+        const selected = props?.items?.[0];
+        if (selected !== undefined) onSelectItemRef.current?.(Number(selected));
+      });
+      timelineRef.current = timeline;
     } catch {
       timelineRef.current = null;
     }

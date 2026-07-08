@@ -4,8 +4,7 @@ import type { ItemSummary } from '@shared/api.js';
 // Labeled tray for items toTimelineData can't place on the axis (unknown
 // precision / null start). Purely presentational: items in, Link-based
 // navigation to the workspace out. Renders nothing when there's nothing
-// undated. Tooltips/click behavior for axis items are Task 13 — this tray is
-// the only clickable timeline surface for now.
+// undated. (Axis items navigate too, via TimelineView's select handler.)
 export function UndatedTray({ items }: { items: ItemSummary[] }) {
   if (items.length === 0) return null;
 
