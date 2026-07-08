@@ -19,7 +19,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   app.get('/api/items', (req) => {
     const { status, personId } = req.query as { status?: string; personId?: string };
     let sql =
-      'SELECT i.id, i.title, i.media_type, i.date_start, i.date_end, i.date_precision, i.status, i.content_hash, i.thumb_path FROM items i';
+      'SELECT DISTINCT i.id, i.title, i.media_type, i.date_start, i.date_end, i.date_precision, i.status, i.content_hash, i.thumb_path FROM items i';
     const where: string[] = [];
     const params: unknown[] = [];
     if (personId) {
@@ -54,11 +54,17 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       | { id: number; status: string }
       | undefined;
     if (!item) return reply.code(404).send({ error: 'not found' });
-    const body = req.body as {
+    const body = (req.body ?? {}) as {
       title?: string; description?: string; transcription?: string;
       date?: { start?: string | null; end?: string | null; precision?: string };
       status?: string;
     };
+    const hasKnownField = ['title', 'description', 'transcription', 'date', 'status'].some(
+      (f) => (body as Record<string, unknown>)[f] !== undefined
+    );
+    if (!hasKnownField) {
+      return reply.code(400).send({ error: 'request body required' });
+    }
     if (body.status !== undefined && body.status !== 'reviewed') {
       return reply.code(400).send({ error: 'invalid status' });
     }
@@ -91,7 +97,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
   app.post('/api/items/:id/people', (req, reply) => {
     const id = Number((req.params as { id: string }).id);
-    const { personId, role } = req.body as { personId: unknown; role: unknown };
+    const { personId, role } = (req.body ?? {}) as { personId: unknown; role: unknown };
     if (typeof personId !== 'number' || !Number.isFinite(personId)) {
       return reply.code(400).send({ error: 'personId must be a number' });
     }
@@ -110,7 +116,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   app.get('/api/people', () => db.prepare('SELECT * FROM people ORDER BY name').all());
 
   app.post('/api/people', (req, reply) => {
-    const { name, notes } = req.body as { name: string; notes?: string };
+    const { name, notes } = (req.body ?? {}) as { name?: string; notes?: string };
     if (!name) return reply.code(400).send({ error: 'name required' });
     const info = db.prepare('INSERT INTO people (name, notes) VALUES (?, ?)').run(name, notes ?? null);
     reply.code(201).send({ id: Number(info.lastInsertRowid), name });
@@ -119,7 +125,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   const MEDIA_TYPES = new Set<MediaType>(['photo', 'letter', 'article', 'audio', 'video', 'pdf']);
 
   app.post('/api/import', async (req, reply) => {
-    const { paths, mediaType } = req.body as { paths: unknown; mediaType: unknown };
+    const { paths, mediaType } = (req.body ?? {}) as { paths: unknown; mediaType: unknown };
     if (!Array.isArray(paths) || !paths.every((p) => typeof p === 'string')) {
       return reply.code(400).send({ error: 'paths must be an array of strings' });
     }

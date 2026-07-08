@@ -75,4 +75,10 @@ describe('normalizeFuzzyDate', () => {
       start: '1943-06-01', end: '1943-06-30', precision: 'month',
     });
   });
+
+  it('ignores a calendar-valid explicit end that is earlier than start, falling back to single-date expansion', () => {
+    expect(normalizeFuzzyDate({ start: '1945-01-01', end: '1943-01-01', precision: 'year' })).toEqual({
+      start: '1945-01-01', end: '1945-12-31', precision: 'year',
+    });
+  });
 });

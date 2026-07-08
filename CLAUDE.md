@@ -6,9 +6,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 KinTrace builds interactive family history timelines from photos, letters, articles, and other archival media.
 
-## Current State
+## Commands
 
-The repository is a fresh start — it contains only the README and LICENSE. There is no code, build tooling, or test infrastructure yet. When the initial implementation lands, update this file with:
+- `npm test` — run the full test suite (vitest)
+- `npx vitest run tests/<file>` — run a single test file
+- `npm run typecheck` — TypeScript, no emit
+- `npm run dev` — start the server (tsx entry point `src/main.ts`), listens on port 3271, data stored under `./data/`. `ANTHROPIC_API_KEY` is optional; without it the AI queue endpoint is disabled (503).
 
-- Build, lint, and test commands (including how to run a single test)
-- The high-level architecture once it takes shape
+## Architecture
+
+KinTrace is a Fastify + better-sqlite3 backend that imports archival media, runs it through an AI vision/transcription pass, and serves a REST API for a timeline UI (not yet built). Modules:
+
+- `src/db.ts` — SQLite schema and `openDb()`.
+- `src/dates.ts` — fuzzy date normalization (exact/month/year/decade/unknown precision, range expansion).
+- `src/importer.ts` — file hashing, dedupe, archiving, and thumbnail generation.
+- `src/ai/transcriber.ts` — `VisionClient` seam plus zod-validated parsing of AI JSON responses.
+- `src/ai/queue.ts` — resumable processor for `pending` items.
+- `src/server.ts` — Fastify route factory (`buildServer`).
+- `src/main.ts` — wires the above together and starts listening.
+
+Key invariants: archive originals are never modified after import; item status moves `pending` → `transcribed` → `reviewed` and never backwards automatically; AI responses are always zod-validated before being trusted; tests inject a fake `VisionClient` and never call the real Anthropic API.

@@ -60,6 +60,23 @@ describe('processPendingItems', () => {
     expect(rows[1].status).toBe('transcribed');
   });
 
+  it('handles a non-Error throw without aborting the run, recording it as ai_error', async () => {
+    const db = openDb(':memory:');
+    seedItem(db, 'h1');
+    const client: VisionClient = {
+      analyzeImages: async () => {
+        throw 'rate limited string';
+      },
+    };
+
+    const result = await processPendingItems(db, client, { resizeForAi: fakeResize });
+    expect(result).toEqual({ processed: 0, failed: 1 });
+
+    const row: any = db.prepare('SELECT status, ai_error FROM items').get();
+    expect(row.status).toBe('pending');
+    expect(row.ai_error).toMatch(/rate limited string/);
+  });
+
   it('does not touch reviewed or transcribed items', async () => {
     const db = openDb(':memory:');
     const id = seedItem(db, 'h1');

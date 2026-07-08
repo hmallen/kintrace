@@ -43,7 +43,10 @@ export async function processPendingItems(
       );
       processed++;
     } catch (e) {
-      db.prepare('UPDATE items SET ai_error = ? WHERE id = ?').run((e as Error).message, item.id);
+      db.prepare('UPDATE items SET ai_error = ? WHERE id = ?').run(
+        e instanceof Error ? e.message : String(e),
+        item.id
+      );
       failed++;
     }
   }

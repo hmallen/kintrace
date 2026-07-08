@@ -118,4 +118,20 @@ describe('REST API', () => {
     });
     expect(badMediaType.statusCode).toBe(400);
   });
+
+  it('returns 400 (not 500) for a PATCH with no body/content-type', async () => {
+    const id = seedItem('h-nobody');
+    const res = await app.inject({ method: 'PATCH', url: `/api/items/${id}` });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('returns each item once from GET /api/items?personId= even when linked under two roles', async () => {
+    const id = seedItem('h-dup');
+    const personId = Number(db.prepare("INSERT INTO people (name) VALUES ('Dual Role')").run().lastInsertRowid);
+    db.prepare("INSERT INTO item_people (item_id, person_id, role) VALUES (?, ?, 'author')").run(id, personId);
+    db.prepare("INSERT INTO item_people (item_id, person_id, role) VALUES (?, ?, 'recipient')").run(id, personId);
+    const res = await app.inject({ method: 'GET', url: `/api/items?personId=${personId}` });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toHaveLength(1);
+  });
 });

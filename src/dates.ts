@@ -42,7 +42,7 @@ export function normalizeFuzzyDate(input: {
   const endMatch = input.end ? ISO.exec(input.end) : null;
   if (endMatch) {
     const [, ey, emo, ed] = endMatch;
-    if (isValidCalendarDate(Number(ey), Number(emo), Number(ed))) {
+    if (isValidCalendarDate(Number(ey), Number(emo), Number(ed)) && input.end! >= start) {
       return { start, end: input.end!, precision };
     }
   }
