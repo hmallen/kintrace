@@ -57,4 +57,35 @@ describe('importFile', () => {
     expect(result.duplicate).toBe(false);
     expect(readdirSync(dirs.cacheDir).length).toBe(0);
   });
+
+  it('resolves a concurrent duplicate-import race to a single winner', async () => {
+    const db = openDb(':memory:');
+    const src = join(dirs.src, 'race.jpg');
+    await makeTestImage(src);
+
+    const [a, b] = await Promise.all([
+      importFile(db, src, { ...dirs, mediaType: 'photo' }),
+      importFile(db, src, { ...dirs, mediaType: 'photo' }),
+    ]);
+
+    const dupFlags = [a.duplicate, b.duplicate].sort();
+    expect(dupFlags).toEqual([false, true]);
+    expect(a.itemId).toBe(b.itemId);
+
+    expect(readdirSync(dirs.archiveDir).length).toBe(1);
+    const count = db.prepare('SELECT COUNT(*) as c FROM items').get() as { c: number };
+    expect(count.c).toBe(1);
+  });
+
+  it('cleans up the archive copy when thumbnailing a corrupt image fails', async () => {
+    const db = openDb(':memory:');
+    const src = join(dirs.src, 'corrupt.jpg');
+    writeFileSync(src, Buffer.from('not a real jpeg'));
+
+    await expect(importFile(db, src, { ...dirs, mediaType: 'photo' })).rejects.toThrow();
+
+    expect(readdirSync(dirs.archiveDir).length).toBe(0);
+    const count = db.prepare('SELECT COUNT(*) as c FROM items').get() as { c: number };
+    expect(count.c).toBe(0);
+  });
 });
