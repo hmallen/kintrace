@@ -12,9 +12,11 @@ CREATE TABLE IF NOT EXISTS items (
   date_end TEXT,
   date_precision TEXT NOT NULL DEFAULT 'unknown'
     CHECK (date_precision IN ('exact','month','year','decade','unknown')),
-  transcription TEXT,
+  transcription_diplomatic TEXT,
+  transcription_normalized TEXT,
   ai_error TEXT,
   ai_names TEXT,
+  ai_confidence TEXT,
   thumb_path TEXT,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','transcribed','reviewed')),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))

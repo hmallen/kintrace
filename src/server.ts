@@ -3,13 +3,13 @@ import type Database from 'better-sqlite3';
 import { importFile, type MediaType } from './importer.js';
 import { processPendingItems } from './ai/queue.js';
 import { normalizeFuzzyDate } from './dates.js';
-import type { VisionClient } from './ai/transcriber.js';
+import type { TranscriptionEngine } from './ai/engine.js';
 
 export interface ServerDeps {
   db: Database.Database;
   archiveDir: string;
   cacheDir: string;
-  client: VisionClient | null;
+  engine: TranscriptionEngine | null;
 }
 
 export function buildServer(deps: ServerDeps): FastifyInstance {
@@ -151,8 +151,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   });
 
   app.post('/api/queue/process', async (_req, reply) => {
-    if (!deps.client) return reply.code(503).send({ error: 'AI client not configured (set ANTHROPIC_API_KEY)' });
-    return processPendingItems(deps.db, deps.client);
+    if (!deps.engine) return reply.code(503).send({ error: 'AI client not configured (set ANTHROPIC_API_KEY)' });
+    return processPendingItems(deps.db, deps.engine);
   });
 
   return app;

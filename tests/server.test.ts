@@ -7,7 +7,7 @@ let app: ReturnType<typeof buildServer>;
 
 beforeEach(() => {
   db = openDb(':memory:');
-  app = buildServer({ db, archiveDir: '/tmp/na', cacheDir: '/tmp/na', client: null });
+  app = buildServer({ db, archiveDir: '/tmp/na', cacheDir: '/tmp/na', engine: null });
 });
 
 function seedItem(hash = 'h1'): number {
