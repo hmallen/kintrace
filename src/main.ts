@@ -19,4 +19,7 @@ const app = buildServer({ db, archiveDir, cacheDir, client });
 const port = Number(process.env.PORT ?? 3271);
 app.listen({ port, host: '127.0.0.1' }).then(() => {
   console.log(`KinTrace API on http://127.0.0.1:${port}`);
+}).catch((err) => {
+  console.error(`Failed to start KinTrace API on port ${port}:`, err.message ?? err);
+  process.exit(1);
 });
