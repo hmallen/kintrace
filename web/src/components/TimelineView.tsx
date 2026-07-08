@@ -29,6 +29,9 @@ export function TimelineView({ data }: { data: TimelineDatum[] }) {
   useEffect(() => {
     try {
       timelineRef.current?.setItems(data);
+      if (data.length > 0) {
+        timelineRef.current?.fit({ animation: false });
+      }
     } catch {
       // jsdom can't lay the items out; ignore (see above).
     }
