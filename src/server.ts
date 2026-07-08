@@ -1,5 +1,7 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import type Database from 'better-sqlite3';
+import fs from 'node:fs';
+import path from 'node:path';
 import { importFile, type MediaType } from './importer.js';
 import { processPendingItems } from './ai/queue.js';
 import { normalizeFuzzyDate } from './dates.js';
@@ -30,6 +32,21 @@ function toItemResponse(row: Record<string, unknown>): Record<string, unknown> {
   }
   return { ...row, ai_confidence: aiConfidence };
 }
+
+const EXTENSION_CONTENT_TYPES: Record<string, string> = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.tif': 'image/tiff',
+  '.tiff': 'image/tiff',
+  '.webp': 'image/webp',
+  '.pdf': 'application/pdf',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.mp4': 'video/mp4',
+  '.mov': 'video/quicktime',
+  '.webm': 'video/webm',
+};
 
 export function buildServer(deps: ServerDeps): FastifyInstance {
   const { db } = deps;
@@ -115,6 +132,33 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     }
     const updated = db.prepare('SELECT * FROM items WHERE id = ?').get(id);
     return { ...toItemResponse(updated as Record<string, unknown>), people: itemPeople(id) };
+  });
+
+  app.get('/api/items/:id/thumbnail', (req, reply) => {
+    const id = Number((req.params as { id: string }).id);
+    const item = db.prepare('SELECT thumb_path FROM items WHERE id = ?').get(id) as
+      | { thumb_path: string | null }
+      | undefined;
+    if (!item || !item.thumb_path || !fs.existsSync(item.thumb_path)) {
+      return reply.code(404).send({ error: 'not found' });
+    }
+    return reply.type('image/jpeg').send(fs.createReadStream(item.thumb_path));
+  });
+
+  app.get('/api/items/:id/file', (req, reply) => {
+    const id = Number((req.params as { id: string }).id);
+    const item = db.prepare('SELECT file_path FROM items WHERE id = ?').get(id) as
+      | { file_path: string | null }
+      | undefined;
+    if (!item || !item.file_path || !fs.existsSync(item.file_path)) {
+      return reply.code(404).send({ error: 'not found' });
+    }
+    const ext = path.extname(item.file_path).toLowerCase();
+    const contentType = EXTENSION_CONTENT_TYPES[ext] ?? 'application/octet-stream';
+    return reply
+      .type(contentType)
+      .header('Content-Disposition', 'inline')
+      .send(fs.createReadStream(item.file_path));
   });
 
   const ITEM_PEOPLE_ROLES = new Set(['subject', 'author', 'recipient']);
