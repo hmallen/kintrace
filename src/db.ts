@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS items (
     CHECK (date_precision IN ('exact','month','year','decade','unknown')),
   transcription TEXT,
   ai_error TEXT,
+  ai_names TEXT,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','transcribed','reviewed')),
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
