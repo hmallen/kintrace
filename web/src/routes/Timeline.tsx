@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useItems } from '../api/hooks';
 import { TimelineView } from '../components/TimelineView';
+import { UndatedTray } from '../components/UndatedTray';
 import { toTimelineData } from '../timeline/translate';
 
 export function Timeline() {
@@ -15,10 +16,7 @@ export function Timeline() {
       {items && (
         <>
           <TimelineView data={data} />
-          {/* Minimal note for now — the undated tray itself lands in Stage 3. */}
-          <p>
-            {undated.length} undated {undated.length === 1 ? 'item' : 'items'}
-          </p>
+          <UndatedTray items={undated} />
         </>
       )}
     </section>

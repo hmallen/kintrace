@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Timeline } from 'vis-timeline/standalone';
 import 'vis-timeline/styles/vis-timeline-graph2d.css';
+import '../timeline/timeline.css';
 import type { TimelineDatum } from '../timeline/translate';
 
 // Thin React wrapper owning the vis-timeline lifecycle: create on mount,
@@ -37,5 +38,7 @@ export function TimelineView({ data }: { data: TimelineDatum[] }) {
     }
   }, [data]);
 
-  return <div ref={containerRef} data-testid="timeline-view" />;
+  // data-item-count is a test hook: jsdom can't lay out vis-timeline's DOM,
+  // so tests assert what the axis received at the toTimelineData boundary.
+  return <div ref={containerRef} data-testid="timeline-view" data-item-count={data.length} />;
 }
