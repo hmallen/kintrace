@@ -1,0 +1,113 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import Uppy from '@uppy/core';
+import XHRUpload from '@uppy/xhr-upload';
+import Dashboard from '@uppy/react/dashboard';
+import { ImportResultSchema, MediaTypeSchema } from '@shared/api.js';
+import type { ImportResult, MediaType } from '@shared/api.js';
+import { summarizeImport } from '../import/summarize';
+import '@uppy/core/css/style.min.css';
+import '@uppy/dashboard/css/style.min.css';
+
+const API_BASE = import.meta.env.VITE_API_BASE ?? '';
+const MEDIA_TYPES = MediaTypeSchema.options;
+
+// Per-file outcomes plus the summary line. Duplicates are informational only
+// (no skip/replace prompts) — the badge links to the item already in the
+// archive; errors are shown inline without blocking the other files.
+export function ImportResults({ results }: { results: ImportResult[] }) {
+  if (results.length === 0) return null;
+  const summary = summarizeImport(results);
+  return (
+    <section aria-label="Import results">
+      <p>{summary.line}</p>
+      <ul>
+        {results.map((result) => (
+          <li key={result.path}>
+            {'error' in result ? (
+              <>
+                {result.path} — {result.error}
+              </>
+            ) : result.duplicate ? (
+              <>
+                {result.path} — <Link to={`/items/${result.itemId}`}>already in archive</Link>
+              </>
+            ) : (
+              <Link to={`/items/${result.itemId}`}>{result.path}</Link>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+export function Import() {
+  const [mediaType, setMediaType] = useState<MediaType>('photo');
+  const [results, setResults] = useState<ImportResult[]>([]);
+  const [responseError, setResponseError] = useState<string | null>(null);
+
+  // The Uppy instance is created in an effect (not a useState initializer) so
+  // StrictMode's mount/unmount/mount cycle never renders the Dashboard against
+  // a destroyed instance; the cleanup destroys whichever instance is live.
+  const [uppy, setUppy] = useState<Uppy | null>(null);
+  useEffect(() => {
+    const instance = new Uppy().use(XHRUpload, {
+      endpoint: `${API_BASE}/api/upload`,
+      formData: true,
+      // One bundled request carries all files, so the backend answers with a
+      // single ImportResult[] covering the whole batch.
+      bundle: true,
+      // With bundle:true the Uppy-level meta (set via setMeta below) is
+      // appended to the same multipart body, so `mediaType` arrives as a
+      // plain form field alongside the file parts.
+      allowedMetaFields: ['mediaType'],
+      onAfterResponse: (xhr) => {
+        if (xhr.status < 200 || xhr.status >= 300) return;
+        try {
+          const raw: unknown = JSON.parse(xhr.responseText);
+          setResults(ImportResultSchema.array().parse(raw));
+          setResponseError(null);
+        } catch {
+          setResponseError('Unexpected response from the server.');
+        }
+      },
+    });
+    // A fresh batch replaces the previous results view.
+    instance.on('upload', () => {
+      setResults([]);
+      setResponseError(null);
+    });
+    setUppy(instance);
+    return () => {
+      instance.destroy();
+    };
+  }, []);
+
+  // Keep the upload's mediaType form field in sync with the selector.
+  useEffect(() => {
+    uppy?.setMeta({ mediaType });
+  }, [uppy, mediaType]);
+
+  return (
+    <section>
+      <h2>Import</h2>
+      <label>
+        Media type{' '}
+        <select
+          value={mediaType}
+          onChange={(e) => setMediaType(MediaTypeSchema.parse(e.target.value))}
+        >
+          {MEDIA_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {type}
+            </option>
+          ))}
+        </select>
+      </label>
+      {uppy && <Dashboard uppy={uppy} />}
+      {responseError && <p role="alert">{responseError}</p>}
+      <ImportResults results={results} />
+    </section>
+  );
+}

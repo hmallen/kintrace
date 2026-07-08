@@ -17,6 +17,16 @@ if (typeof Range.prototype.getClientRects !== 'function') {
   };
 }
 
+// jsdom does not implement ResizeObserver, which Uppy's Dashboard uses to pick
+// its layout; a no-op stub is fine — the Dashboard falls back to mobile view.
+if (typeof globalThis.ResizeObserver !== 'function') {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());

@@ -1,14 +1,11 @@
 import { createBrowserRouter, type RouteObject } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
+import { Import } from './routes/Import';
 import { Library } from './routes/Library';
 import { Timeline } from './routes/Timeline';
 import { Workspace } from './routes/Workspace';
 
-// Placeholder route components — real pages land in later tasks.
-function Import() {
-  return <p>Import</p>;
-}
-
+// Placeholder route component — the real page lands in a later task.
 function People() {
   return <p>People</p>;
 }
