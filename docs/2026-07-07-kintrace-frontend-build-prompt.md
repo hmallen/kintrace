@@ -10,6 +10,16 @@ You are building the **frontend for KinTrace**, an app that turns family photos,
 
 Before any code, follow this project's normal workflow: use **superpowers:brainstorming** to pin down requirements and design, then **superpowers:writing-plans** to produce a written plan, then execute it with **superpowers:subagent-driven-development** (TDD per task, review after each). Do not skip the brainstorm — surface disagreements with the recommendations here before committing. Also load **frontend-design** when you get to visual design, and **claude-api** if you touch any Claude/Anthropic code.
 
+## Models for this build (required)
+
+Model choice is per-role: the executing session (the "controller") picks each subagent's model when it dispatches it. Left to its defaults, `subagent-driven-development` picks the *cheapest capable* model for mechanical tasks — override that here.
+
+- **Plan and review on a strong reasoning model.** Run this session on **Opus 4.8 (1M context)** for the brainstorm, the written plan, and the code reviews. The written plan (from `superpowers:writing-plans`) is a **separate artifact** from this prompt — a task-by-task decomposition with interfaces, test specs, and acceptance criteria. Keep it at the level of **contracts and tests, not literal code**, so the implementer makes the real code-level decisions (that's what makes the implementer's model matter).
+- **Write the code on Fable 5.** When you execute, dispatch **every implementer (code-writing) subagent with `model: claude-fable-5`**, overriding the skill's cheapest-capable-model default. This is a deliberate quality/consistency choice, not a cost-optimized one.
+- **Keep reviewers strong.** Task reviewers on Opus 4.8 or Sonnet 5; the final whole-branch review on the most capable model available — a capable reviewer is what catches an implementer's mistakes.
+
+Simpler alternative: run everything on Fable 5 (planning, code, and review all inherit it). The only tradeoff is slightly weaker plan decomposition and review scrutiny than a top reasoning model gives — acceptable for well-scoped work, but the plan is the highest-leverage artifact, so prefer the strongest model you have for it.
+
 ## Current state (what already exists)
 
 - The backend is a Node 22 / TypeScript (ESM) / Fastify REST API in `src/`, fully tested (46 vitest tests). It was built from `docs/superpowers/plans/2026-07-07-kintrace-backend-core.md` and is on branch `worktree-kintrace-backend-core` / PR #1 — read `CLAUDE.md` for its architecture and commands. Assume it is merged (or merge/branch from it) before you start.
