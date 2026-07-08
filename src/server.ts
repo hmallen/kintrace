@@ -35,6 +35,14 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   const { db } = deps;
   const app = Fastify();
 
+  function itemPeople(itemId: number): unknown[] {
+    return db
+      .prepare(
+        'SELECT p.id, p.name, ip.role FROM item_people ip JOIN people p ON p.id = ip.person_id WHERE ip.item_id = ?'
+      )
+      .all(itemId);
+  }
+
   app.get('/api/items', (req) => {
     const { status, personId } = req.query as { status?: string; personId?: string };
     let sql =
@@ -59,12 +67,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     const id = Number((req.params as { id: string }).id);
     const item = db.prepare('SELECT * FROM items WHERE id = ?').get(id);
     if (!item) return reply.code(404).send({ error: 'not found' });
-    const people = db
-      .prepare(
-        'SELECT p.id, p.name, ip.role FROM item_people ip JOIN people p ON p.id = ip.person_id WHERE ip.item_id = ?'
-      )
-      .all(id);
-    return { ...toItemResponse(item as Record<string, unknown>), people };
+    return { ...toItemResponse(item as Record<string, unknown>), people: itemPeople(id) };
   });
 
   app.patch('/api/items/:id', (req, reply) => {
@@ -111,7 +114,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       db.prepare(`UPDATE items SET ${sets.join(', ')} WHERE id = ?`).run(...params, id);
     }
     const updated = db.prepare('SELECT * FROM items WHERE id = ?').get(id);
-    return toItemResponse(updated as Record<string, unknown>);
+    return { ...toItemResponse(updated as Record<string, unknown>), people: itemPeople(id) };
   });
 
   const ITEM_PEOPLE_ROLES = new Set(['subject', 'author', 'recipient']);

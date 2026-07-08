@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { ConfidenceSchema } from '../../shared/api.js';
+
+export { ConfidenceSchema };
 
 export interface VisionClient {
   analyzeImages(images: Buffer[], prompt: string): Promise<string>;
@@ -92,12 +95,6 @@ function extractJsonObject(text: string): unknown {
 }
 
 // --- Two-pass transcription (draft -> verify) ---
-
-const ConfidenceSchema = z.object({
-  overall: z.enum(['high', 'medium', 'low']),
-  summary: z.string(),
-  flaggedSpans: z.array(z.object({ text: z.string(), reason: z.string() })),
-});
 
 const DraftSchema = z.object({
   transcription_diplomatic: z.string().nullable(),
