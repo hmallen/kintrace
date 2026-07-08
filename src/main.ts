@@ -2,7 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { openDb } from './db.js';
 import { buildServer } from './server.js';
-import { createAnthropicVisionClient } from './ai/transcriber.js';
+import { createAnthropicVisionClient } from './ai/providers.js';
 
 const dataDir = process.env.KINTRACE_DATA ?? join(process.cwd(), 'data');
 const archiveDir = join(dataDir, 'archive');

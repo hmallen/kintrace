@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import Anthropic from '@anthropic-ai/sdk';
 
 export interface VisionClient {
   analyzeImages(images: Buffer[], prompt: string): Promise<string>;
@@ -143,34 +142,4 @@ export async function transcribeItem(
   const result = SuggestionSchema.safeParse(parsed);
   if (!result.success) throw new Error(`AI response invalid: ${result.error.message}`);
   return result.data;
-}
-
-export function createAnthropicVisionClient(apiKey: string): VisionClient {
-  const anthropic = new Anthropic({ apiKey });
-  return {
-    async analyzeImages(images, prompt) {
-      const response = await anthropic.messages.create({
-        model: 'claude-sonnet-5',
-        max_tokens: 4096,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              ...images.map((img) => ({
-                type: 'image' as const,
-                source: {
-                  type: 'base64' as const,
-                  media_type: 'image/jpeg' as const,
-                  data: img.toString('base64'),
-                },
-              })),
-              { type: 'text' as const, text: prompt },
-            ],
-          },
-        ],
-      });
-      const block = response.content.find((b) => b.type === 'text');
-      return block && block.type === 'text' ? block.text : '';
-    },
-  };
 }
