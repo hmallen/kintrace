@@ -298,6 +298,38 @@ describe('Workspace', () => {
     await settled(qc);
   });
 
+  it('chip creates + links as subject', async () => {
+    const { created, links, qc } = await loadWorkspace({ ...baseItem, ai_names: '["Mabel"]' });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Add Mabel as subject' }));
+
+    // Create first, then link with the id the create returned.
+    await waitFor(() => expect(created).toHaveLength(1));
+    expect(created[0]).toEqual({ name: 'Mabel' });
+    await waitFor(() => expect(links).toHaveLength(1));
+    expect(links[0]).toEqual({ personId: 100, role: 'subject' });
+
+    // After the refetch Mabel is a confirmed chip and the suggestion is gone.
+    const chips = screen.getByTestId('people-chips');
+    expect(await within(chips).findByText('Mabel')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Add Mabel as subject' }),
+    ).not.toBeInTheDocument();
+    await settled(qc);
+  });
+
+  it('already-linked name not suggested', async () => {
+    await loadWorkspace({
+      ...baseItem,
+      ai_names: '["Mabel"]',
+      people: [{ id: 7, name: 'Mabel', role: 'subject' }],
+    });
+
+    expect(
+      screen.queryByRole('button', { name: 'Add Mabel as subject' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('null transcription empty state', async () => {
     await loadWorkspace({ ...baseItem, transcription_diplomatic: null });
 

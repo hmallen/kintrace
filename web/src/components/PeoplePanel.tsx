@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { PersonRoleSchema } from '@shared/api.js';
 import type { ItemDetail, PersonRole } from '@shared/api.js';
 import { useCreatePerson, useLinkPerson, usePeople } from '../api/hooks';
+import { suggestibleNames } from '../review/aiNames';
 
 const ROLES = PersonRoleSchema.options;
 
@@ -9,10 +10,20 @@ export function PeoplePanel({ item }: { item: ItemDetail }) {
   const { data: people } = usePeople();
   const linkPerson = useLinkPerson(item.id);
   const createPerson = useCreatePerson();
+  const suggestions = suggestibleNames(item.ai_names, item.people);
 
   const [personId, setPersonId] = useState('');
   const [role, setRole] = useState<PersonRole>('subject');
   const [newName, setNewName] = useState('');
+
+  async function handleSuggestion(name: string) {
+    try {
+      const person = await createPerson.mutateAsync({ name });
+      await linkPerson.mutateAsync({ personId: person.id, role: 'subject' });
+    } catch {
+      // surfaced via mutation errors below
+    }
+  }
 
   async function handleLink() {
     if (personId === '') return;
@@ -65,6 +76,33 @@ export function PeoplePanel({ item }: { item: ItemDetail }) {
         })}
         {item.people.length === 0 && <p style={{ color: '#777' }}>No people linked.</p>}
       </div>
+
+      {suggestions.length > 0 && (
+        <p data-testid="ai-name-suggestions" style={{ margin: '0.25rem 0' }}>
+          <strong>Suggested:</strong>{' '}
+          {suggestions.map((name) => (
+            <button
+              key={name.trim().toLowerCase()}
+              type="button"
+              aria-label={`Add ${name} as subject`}
+              title="AI-suggested name — click to create and link as subject"
+              onClick={() => handleSuggestion(name)}
+              disabled={createPerson.isPending || linkPerson.isPending}
+              style={{
+                padding: '0 0.5em',
+                marginRight: '0.25em',
+                borderRadius: '1em',
+                border: '1px dashed #888',
+                background: 'transparent',
+                fontStyle: 'italic',
+                cursor: 'pointer',
+              }}
+            >
+              {name} +
+            </button>
+          ))}
+        </p>
+      )}
 
       <p>
         <label>
