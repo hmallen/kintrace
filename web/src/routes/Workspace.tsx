@@ -155,7 +155,7 @@ function WorkspaceContent({ item }: { item: ItemDetail }) {
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem' }}>
       <div style={{ flex: '1 1 320px', minWidth: '280px' }}>
-        <MediaViewer itemId={item.id} alt={item.title ?? 'Item media'} />
+        <MediaViewer itemId={item.id} alt={item.title ?? 'Item media'} mediaType={item.media_type} />
       </div>
       <div style={{ flex: '1 1 400px', minWidth: '320px' }}>
         <p>

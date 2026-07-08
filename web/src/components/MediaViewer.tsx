@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { MediaType } from '@shared/api.js';
 
 // Same base-URL knob as web/src/api/client.ts.
 const API_BASE = import.meta.env.VITE_API_BASE ?? '';
@@ -6,10 +7,53 @@ const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 export interface MediaViewerProps {
   itemId: number;
   alt: string;
+  mediaType: MediaType;
 }
 
-// Image-only viewer for this task; other media types come later.
-export function MediaViewer({ itemId, alt }: MediaViewerProps) {
+// Branches by media type; all viewers point at the same file endpoint.
+export function MediaViewer({ itemId, alt, mediaType }: MediaViewerProps) {
+  const src = `${API_BASE}/api/items/${itemId}/file`;
+
+  switch (mediaType) {
+    case 'photo':
+    case 'letter':
+    case 'article':
+      return <ImageViewer src={src} alt={alt} />;
+    case 'audio':
+      return (
+        <figure style={{ margin: 0 }}>
+          <audio controls src={src} aria-label={alt}>
+            Your browser does not support audio playback.
+          </audio>
+        </figure>
+      );
+    case 'video':
+      return (
+        <figure style={{ margin: 0 }}>
+          <video controls src={src} aria-label={alt} style={{ maxWidth: '100%', maxHeight: '80vh' }}>
+            Your browser does not support video playback.
+          </video>
+        </figure>
+      );
+    case 'pdf':
+      return (
+        <figure style={{ margin: 0 }}>
+          <iframe src={src} title={alt} style={{ width: '100%', height: '80vh', border: 0 }} />
+        </figure>
+      );
+    default:
+      return (
+        <figure style={{ margin: 0 }}>
+          <a href={src} download>
+            Download {alt}
+          </a>
+        </figure>
+      );
+  }
+}
+
+// Image viewer with zoom controls (photo/letter/article).
+function ImageViewer({ src, alt }: { src: string; alt: string }) {
   const [zoom, setZoom] = useState(1);
 
   return (
@@ -23,11 +67,7 @@ export function MediaViewer({ itemId, alt }: MediaViewerProps) {
         </button>
       </div>
       <div style={{ overflow: 'auto', maxHeight: '80vh' }}>
-        <img
-          src={`${API_BASE}/api/items/${itemId}/file`}
-          alt={alt}
-          style={{ width: `${zoom * 100}%` }}
-        />
+        <img src={src} alt={alt} style={{ width: `${zoom * 100}%` }} />
       </div>
     </figure>
   );
