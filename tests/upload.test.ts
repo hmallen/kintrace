@@ -24,17 +24,18 @@ interface FilePart {
   data: Buffer;
 }
 
-function uploadForm(files: FilePart[], mediaType?: string): FormData {
+function uploadForm(files: FilePart[], mediaType?: string, imageFallback?: string): FormData {
   const form = new FormData();
   if (mediaType !== undefined) form.append('mediaType', mediaType);
+  if (imageFallback !== undefined) form.append('imageFallback', imageFallback);
   for (const f of files) {
     form.append('files', f.data, { filename: f.name, contentType: 'image/jpeg' });
   }
   return form;
 }
 
-async function postUpload(files: FilePart[], mediaType?: string) {
-  const form = uploadForm(files, mediaType);
+async function postUpload(files: FilePart[], mediaType?: string, imageFallback?: string) {
+  const form = uploadForm(files, mediaType, imageFallback);
   return app.inject({
     method: 'POST',
     url: '/api/upload',
@@ -63,7 +64,10 @@ describe('POST /api/upload', () => {
     const res = await postUpload([{ name: 'grandma.jpg', data: jpeg }], 'photo');
     expect(res.statusCode).toBe(200);
     const results = res.json();
-    expect(results).toEqual([{ path: 'grandma.jpg', itemId: expect.any(Number), duplicate: false }]);
+    expect(results).toEqual([{
+      path: 'grandma.jpg', itemId: expect.any(Number), duplicate: false,
+      mediaType: 'photo', status: 'pending', autoSelected: false,
+    }]);
 
     const row = db.prepare('SELECT * FROM items WHERE id = ?').get(results[0].itemId) as
       | Record<string, unknown>
@@ -113,7 +117,7 @@ describe('POST /api/upload', () => {
     const res = await postUpload([{ name: 'x.jpg', data: jpeg }], 'bogus');
     expect(res.statusCode).toBe(400);
     expect(res.json()).toEqual({
-      error: 'mediaType must be one of photo, letter, article, audio, video, pdf',
+      error: 'mediaType must be auto or one of photo, letter, article, audio, video, pdf',
     });
   });
 
@@ -129,7 +133,10 @@ describe('POST /api/upload', () => {
     expect(res.statusCode).toBe(200);
     const results = res.json();
     expect(results).toHaveLength(2);
-    expect(results[0]).toEqual({ path: 'good.jpg', itemId: expect.any(Number), duplicate: false });
+    expect(results[0]).toEqual({
+      path: 'good.jpg', itemId: expect.any(Number), duplicate: false,
+      mediaType: 'photo', status: 'pending', autoSelected: false,
+    });
     expect(results[1].path).toBe('corrupt.jpg');
     expect(typeof results[1].error).toBe('string');
     expect(results[1].itemId).toBeUndefined();
@@ -150,5 +157,12 @@ describe('POST /api/upload', () => {
 
     await postUpload([{ name: 'ok2.jpg', data: good }], 'bogus');
     expect(await readdir(stagingDir)).toEqual([]);
+  });
+
+  it('auto-detects reliable file formats and uses the chosen fallback for images', async () => {
+    const jpeg = await makeJpeg();
+    const res = await postUpload([{ name: 'diploma-scan.jpg', data: jpeg }], 'auto', 'pdf');
+    expect(res.statusCode).toBe(200);
+    expect(res.json()[0]).toMatchObject({ mediaType: 'pdf', autoSelected: true });
   });
 });

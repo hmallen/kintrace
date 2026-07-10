@@ -69,6 +69,14 @@ const EXTENSION_CONTENT_TYPES: Record<string, string> = {
 
 const MEDIA_TYPES = new Set<MediaType>(['photo', 'letter', 'article', 'audio', 'video', 'pdf']);
 
+function inferUploadMediaType(filename: string, fallback: MediaType): MediaType {
+  const ext = path.extname(filename).toLowerCase();
+  if (ext === '.pdf') return 'pdf';
+  if (['.mp3', '.wav'].includes(ext)) return 'audio';
+  if (['.mp4', '.mov', '.webm'].includes(ext)) return 'video';
+  return fallback;
+}
+
 export function buildServer(deps: ServerDeps): FastifyInstance {
   const { db } = deps;
   const app = Fastify();
@@ -324,6 +332,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     // files, so imports run only once all parts are consumed).
     const staged: { filename: string; stagedPath: string }[] = [];
     let mediaType: unknown;
+    let imageFallback: unknown;
     try {
       for await (const part of req.parts()) {
         if (part.type === 'file') {
@@ -336,24 +345,39 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
           staged.push({ filename: part.filename, stagedPath });
         } else if (part.fieldname === 'mediaType') {
           mediaType = part.value;
+        } else if (part.fieldname === 'imageFallback') {
+          imageFallback = part.value;
         }
       }
-      if (typeof mediaType !== 'string' || !MEDIA_TYPES.has(mediaType as MediaType)) {
+      const auto = mediaType === 'auto';
+      if ((!auto && (typeof mediaType !== 'string' || !MEDIA_TYPES.has(mediaType as MediaType)))
+        || (auto && (typeof imageFallback !== 'string' || !MEDIA_TYPES.has(imageFallback as MediaType)))) {
         // Return (not reply.send) so the finally-block cleanup completes
         // before Fastify serializes the response.
         reply.code(400);
-        return { error: 'mediaType must be one of photo, letter, article, audio, video, pdf' };
+        return { error: 'mediaType must be auto or one of photo, letter, article, audio, video, pdf' };
       }
-      const validMediaType = mediaType as MediaType;
       const results = [];
       for (const { filename, stagedPath } of staged) {
         try {
+          const validMediaType = auto
+            ? inferUploadMediaType(filename, imageFallback as MediaType)
+            : mediaType as MediaType;
           const r = await importFile(deps.db, stagedPath, {
             archiveDir: deps.archiveDir,
             cacheDir: deps.cacheDir,
             mediaType: validMediaType,
           });
-          results.push({ path: filename, ...r });
+          const item = db.prepare('SELECT media_type, status FROM items WHERE id = ?').get(r.itemId) as {
+            media_type: MediaType; status: 'pending' | 'transcribed' | 'reviewed';
+          };
+          results.push({
+            path: filename,
+            ...r,
+            mediaType: item.media_type,
+            status: item.status,
+            autoSelected: auto && item.media_type === validMediaType,
+          });
         } catch (e) {
           results.push({ path: filename, error: (e as Error).message });
         }

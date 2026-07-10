@@ -6,12 +6,22 @@ import Dashboard from '@uppy/react/dashboard';
 import { ImportResultSchema, MediaTypeSchema } from '@shared/api.js';
 import type { GedcomImportResult, ImportResult, MediaType } from '@shared/api.js';
 import { API_BASE } from '../api/client';
+import { useUpdateItem } from '../api/hooks';
 import { useImportGedcom } from '../api/hooks';
 import { summarizeImport } from '../import/summarize';
 import '@uppy/core/css/style.min.css';
 import '@uppy/dashboard/css/style.min.css';
 
 const MEDIA_TYPES = MediaTypeSchema.options;
+
+const MEDIA_TYPE_LABELS: Record<MediaType, string> = {
+  photo: 'Photograph',
+  letter: 'Letter or correspondence',
+  article: 'Newspaper or magazine article',
+  pdf: 'General document (certificate, diploma, form, or record)',
+  audio: 'Audio recording',
+  video: 'Video recording',
+};
 
 const MEDIA_TYPE_IMPLICATIONS: Record<MediaType, { label: string; description: string }> = {
   photo: {
@@ -40,9 +50,9 @@ const MEDIA_TYPE_IMPLICATIONS: Record<MediaType, { label: string; description: s
       'Stored as a video recording and opened in the video player. Image-based AI transcription does not extract its speech.',
   },
   pdf: {
-    label: 'PDF',
+    label: 'General document',
     description:
-      'Treated as a scanned document. AI attempts to transcribe all legible text, and the original opens in the PDF viewer.',
+      'Use for certificates, diplomas, forms, official records, and other text-bearing documents—printed or handwritten. AI attempts to transcribe all legible text.',
   },
 };
 
@@ -72,6 +82,46 @@ export function MediaTypeImplications({ selected }: { selected: MediaType }) {
 // Per-file outcomes plus the summary line. Duplicates are informational only
 // (no skip/replace prompts) — the badge links to the item already in the
 // archive; errors are shown inline without blocking the other files.
+function ImportedDocument({ result }: { result: Exclude<ImportResult, { error: string }> }) {
+  const update = useUpdateItem(result.itemId);
+  const [mediaType, setMediaType] = useState(result.mediaType);
+  const editable = result.status === 'pending';
+  return (
+    <li className="import-preview-card">
+      <div className="import-preview-image">
+        <img src={`${API_BASE}/api/items/${result.itemId}/thumbnail`} alt="" />
+      </div>
+      <div>
+        <Link to={`/items/${result.itemId}`}>{result.path}</Link>
+        {result.duplicate && <> — already in archive</>}
+        <label>
+          Document type{' '}
+          <select
+            aria-label={`Document type for ${result.path}`}
+            value={mediaType}
+            disabled={!editable || update.isPending}
+            onChange={async (event) => {
+              const next = MediaTypeSchema.parse(event.target.value);
+              const previous = mediaType;
+              setMediaType(next);
+              try {
+                await update.mutateAsync({ media_type: next });
+              } catch {
+                setMediaType(previous);
+              }
+            }}
+          >
+            {MEDIA_TYPES.map((type) => <option key={type} value={type}>{MEDIA_TYPE_LABELS[type]}</option>)}
+          </select>
+        </label>
+        {result.autoSelected && <small>Automatically selected from the file format. Review before processing.</small>}
+        {!editable && <small>Type is locked because this item has already been processed.</small>}
+        {update.isError && <small role="alert">Could not update the document type.</small>}
+      </div>
+    </li>
+  );
+}
+
 export function ImportResults({ results }: { results: ImportResult[] }) {
   if (results.length === 0) return null;
   const summary = summarizeImport(results);
@@ -79,22 +129,18 @@ export function ImportResults({ results }: { results: ImportResult[] }) {
     <section aria-label="Import results">
       <p>{summary.line}</p>
       <ul>
-        {results.map((result, index) => (
-          // Composite key: two files in one batch can share a filename.
-          <li key={`${index}-${result.path}`}>
-            {'error' in result ? (
+        {results.map((result, index) =>
+          'error' in result ? (
+            // Composite key: two files in one batch can share a filename.
+            <li key={`${index}-${result.path}`}>
               <>
                 {result.path} — {result.error}
               </>
-            ) : result.duplicate ? (
-              <>
-                {result.path} — <Link to={`/items/${result.itemId}`}>already in archive</Link>
-              </>
-            ) : (
-              <Link to={`/items/${result.itemId}`}>{result.path}</Link>
-            )}
-          </li>
-        ))}
+            </li>
+          ) : (
+            <ImportedDocument key={`${index}-${result.path}`} result={result} />
+          )
+        )}
       </ul>
     </section>
   );
@@ -126,7 +172,8 @@ export function GedcomImportResults({ result }: { result: GedcomImportResult | n
 
 export function Import() {
   const [mode, setMode] = useState<'media' | 'gedcom'>('media');
-  const [mediaType, setMediaType] = useState<MediaType>('photo');
+  const [mediaType, setMediaType] = useState<MediaType>('pdf');
+  const [autoDetect, setAutoDetect] = useState(true);
   const [results, setResults] = useState<ImportResult[]>([]);
   const [gedcomFile, setGedcomFile] = useState<File | null>(null);
   const [gedcomResult, setGedcomResult] = useState<GedcomImportResult | null>(null);
@@ -147,7 +194,7 @@ export function Import() {
       // With bundle:true the Uppy-level meta (set via setMeta below) is
       // appended to the same multipart body, so `mediaType` arrives as a
       // plain form field alongside the file parts.
-      allowedMetaFields: ['mediaType'],
+      allowedMetaFields: ['mediaType', 'imageFallback'],
       onAfterResponse: (xhr) => {
         if (xhr.status < 200 || xhr.status >= 300) return;
         try {
@@ -172,8 +219,8 @@ export function Import() {
 
   // Keep the upload's mediaType form field in sync with the selector.
   useEffect(() => {
-    uppy?.setMeta({ mediaType });
-  }, [uppy, mediaType]);
+    uppy?.setMeta({ mediaType: autoDetect ? 'auto' : mediaType, imageFallback: mediaType });
+  }, [uppy, mediaType, autoDetect]);
 
   return (
     <section>
@@ -202,14 +249,18 @@ export function Import() {
         <>
           <div className="import-controls">
             <label>
-              Media type{' '}
+              <input type="checkbox" checked={autoDetect} onChange={(e) => setAutoDetect(e.target.checked)} />{' '}
+              Automatically identify PDF, audio, and video files
+            </label>
+            <label>
+              {autoDetect ? 'Type to use for image files' : 'Type for every file in this batch'}{' '}
               <select
                 value={mediaType}
                 onChange={(e) => setMediaType(MediaTypeSchema.parse(e.target.value))}
               >
                 {MEDIA_TYPES.map((type) => (
                   <option key={type} value={type}>
-                    {type}
+                    {MEDIA_TYPE_LABELS[type]}
                   </option>
                 ))}
               </select>

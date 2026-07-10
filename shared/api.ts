@@ -136,7 +136,14 @@ export const MergePeopleResultSchema = PersonSchema;
 export type MergePeopleResult = z.infer<typeof MergePeopleResultSchema>;
 
 export const ImportResultSchema = z.union([
-  z.object({ path: z.string(), itemId: z.number(), duplicate: z.boolean() }),
+  z.object({
+    path: z.string(),
+    itemId: z.number(),
+    duplicate: z.boolean(),
+    mediaType: MediaTypeSchema,
+    status: StatusSchema,
+    autoSelected: z.boolean(),
+  }),
   z.object({ path: z.string(), error: z.string() }),
 ]);
 export type ImportResult = z.infer<typeof ImportResultSchema>;

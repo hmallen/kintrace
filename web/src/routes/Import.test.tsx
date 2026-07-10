@@ -10,8 +10,8 @@ import { Import, ImportResults } from './Import';
 // ImportResult[] straight into the results-rendering component; the real
 // upload path is exercised in a later in-browser check.
 const results: ImportResult[] = [
-  { path: 'fresh.jpg', itemId: 7, duplicate: false },
-  { path: 'dupe.jpg', itemId: 3, duplicate: true },
+  { path: 'fresh.jpg', itemId: 7, duplicate: false, mediaType: 'pdf', status: 'pending', autoSelected: false },
+  { path: 'dupe.jpg', itemId: 3, duplicate: true, mediaType: 'photo', status: 'reviewed', autoSelected: false },
   { path: 'broken.jpg', error: 'unsupported file type' },
 ];
 
@@ -28,25 +28,30 @@ function renderImport() {
 describe('Import', () => {
   it('renders per-file outcomes', () => {
     render(
-      <MemoryRouter>
-        <ImportResults results={results} />
-      </MemoryRouter>,
+      <QueryClientProvider client={makeQueryClient()}>
+        <MemoryRouter>
+          <ImportResults results={results} />
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
 
     const importedLink = screen.getByRole('link', { name: /fresh\.jpg/ });
     expect(importedLink).toHaveAttribute('href', '/items/7');
 
-    const duplicateBadge = screen.getByRole('link', { name: /already in archive/ });
+    const duplicateBadge = screen.getByRole('link', { name: /dupe\.jpg/ });
     expect(duplicateBadge).toHaveAttribute('href', '/items/3');
+    expect(screen.getAllByText(/already in archive/)).toHaveLength(2);
 
     expect(screen.getByText(/unsupported file type/)).toBeInTheDocument();
   });
 
   it('renders summary line', () => {
     render(
-      <MemoryRouter>
-        <ImportResults results={results} />
-      </MemoryRouter>,
+      <QueryClientProvider client={makeQueryClient()}>
+        <MemoryRouter>
+          <ImportResults results={results} />
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
 
     expect(screen.getByText('1 imported, 1 already in archive, 1 failed')).toBeInTheDocument();
@@ -55,15 +60,15 @@ describe('Import', () => {
   it('media-type selector present', () => {
     renderImport();
 
-    const selector = screen.getByRole('combobox', { name: /media type/i });
+    const selector = screen.getByRole('combobox', { name: /type to use for image files/i });
     const options = within(selector).getAllByRole('option');
     expect(options.map((o) => o.textContent)).toEqual([
-      'photo',
-      'letter',
-      'article',
-      'audio',
-      'video',
-      'pdf',
+      'Photograph',
+      'Letter or correspondence',
+      'Newspaper or magazine article',
+      'Audio recording',
+      'Video recording',
+      'General document (certificate, diploma, form, or record)',
     ]);
   });
 
@@ -76,12 +81,12 @@ describe('Import', () => {
     expect(within(panel).getByText(/preserves original spelling, punctuation, and line breaks/i)).toBeInTheDocument();
     expect(within(panel).getByText(/headline and full article text/i)).toBeInTheDocument();
     expect(within(panel).getAllByText(/does not extract its speech/i)).toHaveLength(2);
-    expect(within(panel).getByText(/original opens in the PDF viewer/i)).toBeInTheDocument();
+    expect(within(panel).getByText(/certificates, diplomas, forms, official records/i)).toBeInTheDocument();
 
-    expect(within(panel).getByText('Photo').closest('div')).toHaveClass('is-selected');
-    await user.selectOptions(screen.getByRole('combobox', { name: /media type/i }), 'letter');
+    expect(within(panel).getByText('General document').closest('div')).toHaveClass('is-selected');
+    await user.selectOptions(screen.getByRole('combobox', { name: /type to use for image files/i }), 'letter');
     expect(within(panel).getByText('Letter').closest('div')).toHaveClass('is-selected');
-    expect(within(panel).getByText('Photo').closest('div')).not.toHaveClass('is-selected');
+    expect(within(panel).getByText('General document').closest('div')).not.toHaveClass('is-selected');
   });
 
   it('can switch to GEDCOM family tree import mode', async () => {
@@ -92,6 +97,6 @@ describe('Import', () => {
 
     expect(screen.getByLabelText(/GEDCOM file/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Queue GEDCOM for review/i })).toBeDisabled();
-    expect(screen.queryByRole('combobox', { name: /media type/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /type to use|type for every/i })).not.toBeInTheDocument();
   });
 });
