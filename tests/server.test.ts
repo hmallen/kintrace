@@ -62,6 +62,133 @@ describe('REST API', () => {
     expect(list.json()).toHaveLength(1);
   });
 
+  it('deletes a library item and its dependent links without deleting people', async () => {
+    const itemId = seedItem('h-delete');
+    const personId = Number(db.prepare("INSERT INTO people (name) VALUES ('Mabel')").run().lastInsertRowid);
+    db.prepare("INSERT INTO item_people VALUES (?, ?, 'subject')").run(itemId, personId);
+    db.prepare("INSERT INTO pages (item_id, page_index, file_path) VALUES (?, 0, '/page.jpg')").run(itemId);
+
+    const response = await app.inject({ method: 'DELETE', url: `/api/items/${itemId}` });
+
+    expect(response.statusCode).toBe(204);
+    expect(db.prepare('SELECT * FROM items WHERE id = ?').get(itemId)).toBeUndefined();
+    expect(db.prepare('SELECT * FROM item_people WHERE item_id = ?').all(itemId)).toEqual([]);
+    expect(db.prepare('SELECT * FROM pages WHERE item_id = ?').all(itemId)).toEqual([]);
+    expect(db.prepare('SELECT name FROM people WHERE id = ?').get(personId)).toEqual({ name: 'Mabel' });
+    expect((await app.inject({ method: 'DELETE', url: `/api/items/${itemId}` })).statusCode).toBe(404);
+  });
+
+  it('removes one person role tag without removing another role', async () => {
+    const itemId = seedItem('h-unlink');
+    const personId = Number(db.prepare("INSERT INTO people (name) VALUES ('Mabel')").run().lastInsertRowid);
+    db.prepare("INSERT INTO item_people VALUES (?, ?, 'subject')").run(itemId, personId);
+    db.prepare("INSERT INTO item_people VALUES (?, ?, 'recipient')").run(itemId, personId);
+
+    const response = await app.inject({
+      method: 'DELETE',
+      url: `/api/items/${itemId}/people/${personId}/recipient`,
+    });
+
+    expect(response.statusCode).toBe(204);
+    expect(db.prepare('SELECT role FROM item_people WHERE item_id = ?').all(itemId))
+      .toEqual([{ role: 'subject' }]);
+    expect((await app.inject({
+      method: 'DELETE', url: `/api/items/${itemId}/people/${personId}/recipient`,
+    })).statusCode).toBe(404);
+  });
+
+  it('changes media type only while an item is pending', async () => {
+    const pendingId = Number(db.prepare(
+      "INSERT INTO items (file_path, content_hash, media_type, title) VALUES ('/queued.jpg', 'h-type-pending', 'photo', 'Queued item')"
+    ).run().lastInsertRowid);
+    const changed = await app.inject({
+      method: 'PATCH', url: `/api/items/${pendingId}`, payload: { media_type: 'article' },
+    });
+    expect(changed.statusCode).toBe(200);
+    expect(changed.json().media_type).toBe('article');
+
+    const transcribedId = seedItem('h-type-done');
+    const rejected = await app.inject({
+      method: 'PATCH',
+      url: `/api/items/${transcribedId}`,
+      payload: { media_type: 'pdf', title: 'Should not change' },
+    });
+    expect(rejected.statusCode).toBe(409);
+    expect(db.prepare('SELECT media_type, title FROM items WHERE id = ?').get(transcribedId))
+      .toEqual({ media_type: 'letter', title: 'A letter' });
+
+    expect((await app.inject({
+      method: 'PATCH', url: `/api/items/${pendingId}`, payload: { media_type: 'document' },
+    })).statusCode).toBe(400);
+  });
+
+  it('merges duplicate people and preserves references and complementary details', async () => {
+    const keepId = Number(db.prepare(
+      "INSERT INTO people (name, birth_start, birth_end, birth_precision, notes) VALUES ('Mabel Smith', '1900-01-01', '1900-12-31', 'year', 'Family notes')"
+    ).run().lastInsertRowid);
+    const duplicateId = Number(db.prepare(
+      "INSERT INTO people (name, death_start, death_end, death_precision, notes) VALUES ('Mabel Smith', '1980-01-01', '1980-12-31', 'year', 'GEDCOM notes')"
+    ).run().lastInsertRowid);
+    const relativeId = Number(db.prepare("INSERT INTO people (name) VALUES ('Earl Smith')").run().lastInsertRowid);
+    const itemId = seedItem('h-merge');
+    db.prepare("INSERT INTO item_people VALUES (?, ?, 'subject')").run(itemId, keepId);
+    db.prepare("INSERT INTO item_people VALUES (?, ?, 'subject')").run(itemId, duplicateId);
+    db.prepare("INSERT INTO item_people VALUES (?, ?, 'author')").run(itemId, duplicateId);
+    const eventId = Number(db.prepare(
+      "INSERT INTO events (title, person_id) VALUES ('Homecoming', ?)"
+    ).run(duplicateId).lastInsertRowid);
+    const importId = Number(db.prepare(
+      "INSERT INTO gedcom_imports (original_filename, content_hash, archived_file_path, counts_json, warnings_json) VALUES ('tree.ged', 'ged-hash', '/tree.ged', '{}', '[]')"
+    ).run().lastInsertRowid);
+    db.prepare(
+      "INSERT INTO gedcom_xrefs (gedcom_import_id, gedcom_xref, entity_type, entity_id) VALUES (?, '@I1@', 'person', ?)"
+    ).run(importId, duplicateId);
+    db.prepare(
+      "INSERT INTO person_relationships (person_id, related_person_id, relationship) VALUES (?, ?, 'spouse')"
+    ).run(keepId, relativeId);
+    db.prepare(
+      "INSERT INTO person_relationships (person_id, related_person_id, relationship) VALUES (?, ?, 'spouse')"
+    ).run(duplicateId, relativeId);
+    db.prepare(
+      "INSERT INTO person_relationships (person_id, related_person_id, relationship) VALUES (?, ?, 'spouse')"
+    ).run(duplicateId, keepId);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/people/merge',
+      payload: { keepId, duplicateId },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      id: keepId,
+      name: 'Mabel Smith',
+      notes: 'Family notes\n\nGEDCOM notes',
+    });
+    expect(db.prepare('SELECT * FROM people WHERE id = ?').get(duplicateId)).toBeUndefined();
+    expect(db.prepare('SELECT birth_start, death_start FROM people WHERE id = ?').get(keepId))
+      .toEqual({ birth_start: '1900-01-01', death_start: '1980-01-01' });
+    expect(db.prepare('SELECT role FROM item_people WHERE item_id = ? ORDER BY role').all(itemId))
+      .toEqual([{ role: 'author' }, { role: 'subject' }]);
+    expect(db.prepare('SELECT person_id FROM events WHERE id = ?').get(eventId)).toEqual({ person_id: keepId });
+    expect(db.prepare("SELECT entity_id FROM gedcom_xrefs WHERE gedcom_xref = '@I1@'").get())
+      .toEqual({ entity_id: keepId });
+    expect(db.prepare(
+      'SELECT person_id, related_person_id, relationship FROM person_relationships ORDER BY id'
+    ).all()).toEqual([{ person_id: keepId, related_person_id: relativeId, relationship: 'spouse' }]);
+  });
+
+  it('validates people merge ids and leaves both records intact on errors', async () => {
+    const personId = Number(db.prepare("INSERT INTO people (name) VALUES ('Mabel')").run().lastInsertRowid);
+    expect((await app.inject({
+      method: 'POST', url: '/api/people/merge', payload: { keepId: personId, duplicateId: personId },
+    })).statusCode).toBe(400);
+    expect((await app.inject({
+      method: 'POST', url: '/api/people/merge', payload: { keepId: personId, duplicateId: 9999 },
+    })).statusCode).toBe(404);
+    expect(db.prepare('SELECT COUNT(*) AS count FROM people').get()).toEqual({ count: 1 });
+  });
+
   it('returns 404 for missing items and 503 for queue without AI client', async () => {
     expect((await app.inject({ method: 'GET', url: '/api/items/999' })).statusCode).toBe(404);
     const queue = await app.inject({ method: 'POST', url: '/api/queue/process' });

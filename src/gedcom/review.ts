@@ -164,13 +164,31 @@ export function listGedcomReviewQueue(db: Database.Database) {
 export function reviewGedcomItem(db: Database.Database, id: number, action: ReviewAction) {
   return db.transaction(() => {
     const row = getRow(db, id);
-    if (row.status !== 'pending') return serialize(row);
-    if (action === 'accept') materialize(db, row);
-    db.prepare(
-      `UPDATE gedcom_review_items
-       SET status = ?, reviewed_at = datetime('now') WHERE id = ?`
-    ).run(action === 'accept' ? 'accepted' : 'rejected', id);
-    return serialize(getRow(db, id));
+    return reviewRow(db, row, action);
+  })();
+}
+
+function reviewRow(db: Database.Database, row: ReviewRow, action: ReviewAction) {
+  if (row.status !== 'pending') return serialize(row);
+  if (action === 'accept') materialize(db, row);
+  db.prepare(
+    `UPDATE gedcom_review_items
+     SET status = ?, reviewed_at = datetime('now') WHERE id = ?`
+  ).run(action === 'accept' ? 'accepted' : 'rejected', row.id);
+  return serialize(getRow(db, row.id));
+}
+
+export function reviewGedcomSelection(
+  db: Database.Database,
+  ids: number[],
+  action: ReviewAction,
+) {
+  return db.transaction(() => {
+    const uniqueIds = [...new Set(ids)];
+    const rows = uniqueIds.map((id) => getRow(db, id));
+    const order: Record<ReviewGroup, number> = { people: 1, relationships: 2, events: 3 };
+    rows.sort((a, b) => order[a.group_type] - order[b.group_type] || a.id - b.id);
+    return rows.map((row) => reviewRow(db, row, action));
   })();
 }
 

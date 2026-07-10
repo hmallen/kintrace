@@ -120,6 +120,47 @@ describe('GEDCOM API', () => {
     expect((await app.inject({ method: 'GET', url: '/api/people' })).json()).toEqual([]);
   });
 
+  it('accepts a selected person and their event atomically in dependency order', async () => {
+    const form = formWithFile('selected.ged', [
+      '0 HEAD',
+      '1 CHAR UTF-8',
+      '0 @I1@ INDI',
+      '1 NAME John /Smith/',
+      '1 BIRT',
+      '2 DATE 1901',
+    ].join('\n'));
+    await app.inject({
+      method: 'POST',
+      url: '/api/gedcom/import',
+      payload: form,
+      headers: form.getHeaders(),
+    });
+    const queue = (await app.inject({ method: 'GET', url: '/api/gedcom/review' })).json();
+    const personId = queue.groups.find((group: { group: string }) => group.group === 'people').items[0].id;
+    const eventId = queue.groups.find((group: { group: string }) => group.group === 'events').items[0].id;
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/gedcom/review/selection/accept',
+      payload: { ids: [eventId, personId] },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().map((item: { group: string; status: string }) => [item.group, item.status]))
+      .toEqual([['people', 'accepted'], ['events', 'accepted']]);
+    expect((await app.inject({ method: 'GET', url: '/api/people' })).json()).toHaveLength(1);
+    expect((await app.inject({ method: 'GET', url: '/api/events' })).json()).toHaveLength(1);
+  });
+
+  it('validates selected GEDCOM review ids', async () => {
+    expect((await app.inject({
+      method: 'POST', url: '/api/gedcom/review/selection/accept', payload: { ids: [] },
+    })).statusCode).toBe(400);
+    expect((await app.inject({
+      method: 'POST', url: '/api/gedcom/review/selection/retry', payload: { ids: [1] },
+    })).statusCode).toBe(400);
+  });
+
   it('rejects invalid GEDCOM uploads with 400-level errors', async () => {
     const missing = await app.inject({ method: 'POST', url: '/api/gedcom/import' });
     expect(missing.statusCode).toBe(400);

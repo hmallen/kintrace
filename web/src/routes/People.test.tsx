@@ -47,8 +47,8 @@ describe('People', () => {
     server.use(peopleHandler(people));
     renderAt('/people');
 
-    expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
-    expect(screen.getByText('Charles Babbage')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Ada Lovelace' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Charles Babbage' })).toBeInTheDocument();
     expect(screen.getByText('Mathematician and writer')).toBeInTheDocument();
   });
 
@@ -87,5 +87,29 @@ describe('People', () => {
       );
     });
     expect(await screen.findByText(/filtered by person/i)).toBeInTheDocument();
+  });
+
+  it('merges a selected duplicate into the person to keep', async () => {
+    const list = [...people];
+    const bodies: unknown[] = [];
+    server.use(
+      http.get('/api/people', () => HttpResponse.json(list)),
+      http.post('/api/people/merge', async ({ request }) => {
+        const body = (await request.json()) as { keepId: number; duplicateId: number };
+        bodies.push(body);
+        const duplicateIndex = list.findIndex((person) => person.id === body.duplicateId);
+        list.splice(duplicateIndex, 1);
+        return HttpResponse.json(list.find((person) => person.id === body.keepId));
+      }),
+    );
+    renderAt('/people');
+
+    await userEvent.selectOptions(await screen.findByLabelText(/^keep/i), '1');
+    await userEvent.selectOptions(screen.getByLabelText(/merge duplicate/i), '2');
+    await userEvent.click(screen.getByRole('button', { name: /merge people/i }));
+
+    await waitFor(() => expect(screen.queryByText('Charles Babbage')).not.toBeInTheDocument());
+    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
+    expect(bodies).toEqual([{ keepId: 1, duplicateId: 2 }]);
   });
 });

@@ -17,9 +17,11 @@ import {
   listGedcomReviewQueue,
   reviewGedcomGroup,
   reviewGedcomItem,
+  reviewGedcomSelection,
   type ReviewAction,
   type ReviewGroup,
 } from './gedcom/review.js';
+import { MergePeopleError, mergePeople } from './people.js';
 
 export interface ServerDeps {
   db: Database.Database;
@@ -64,6 +66,8 @@ const EXTENSION_CONTENT_TYPES: Record<string, string> = {
   '.mov': 'video/quicktime',
   '.webm': 'video/webm',
 };
+
+const MEDIA_TYPES = new Set<MediaType>(['photo', 'letter', 'article', 'audio', 'video', 'pdf']);
 
 export function buildServer(deps: ServerDeps): FastifyInstance {
   const { db } = deps;
@@ -115,13 +119,13 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       | undefined;
     if (!item) return reply.code(404).send({ error: 'not found' });
     const body = (req.body ?? {}) as {
-      title?: string; description?: string;
+      media_type?: string; title?: string; description?: string;
       transcription_diplomatic?: string; transcription_normalized?: string;
       date?: { start?: string | null; end?: string | null; precision?: string };
       status?: string;
     };
     const hasKnownField = [
-      'title', 'description', 'transcription_diplomatic', 'transcription_normalized', 'date', 'status',
+      'media_type', 'title', 'description', 'transcription_diplomatic', 'transcription_normalized', 'date', 'status',
     ].some((f) => (body as Record<string, unknown>)[f] !== undefined);
     if (!hasKnownField) {
       return reply.code(400).send({ error: 'request body required' });
@@ -132,8 +136,20 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     if (body.status === 'reviewed' && item.status === 'pending') {
       return reply.code(409).send({ error: 'item not transcribed yet' });
     }
+    if (body.media_type !== undefined) {
+      if (!MEDIA_TYPES.has(body.media_type as MediaType)) {
+        return reply.code(400).send({ error: 'invalid media type' });
+      }
+      if (item.status !== 'pending') {
+        return reply.code(409).send({ error: 'media type can only be changed while an item is pending' });
+      }
+    }
     const sets: string[] = [];
     const params: unknown[] = [];
+    if (body.media_type !== undefined) {
+      sets.push('media_type = ?');
+      params.push(body.media_type);
+    }
     for (const field of ['title', 'description', 'transcription_diplomatic', 'transcription_normalized'] as const) {
       if (body[field] !== undefined) {
         sets.push(`${field} = ?`);
@@ -164,6 +180,16 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       return reply.code(404).send({ error: 'not found' });
     }
     return reply.type('image/jpeg').send(fs.createReadStream(item.thumb_path));
+  });
+
+  app.delete('/api/items/:id', (req, reply) => {
+    const id = Number((req.params as { id: string }).id);
+    if (!Number.isSafeInteger(id) || id < 1) {
+      return reply.code(400).send({ error: 'invalid item id' });
+    }
+    const result = db.prepare('DELETE FROM items WHERE id = ?').run(id);
+    if (result.changes === 0) return reply.code(404).send({ error: 'item not found' });
+    return reply.code(204).send();
   });
 
   app.get('/api/items/:id/file', (req, reply) => {
@@ -202,6 +228,30 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     reply.code(204).send();
   });
 
+  app.delete('/api/items/:id/people/:personId/:role', (req, reply) => {
+    const { id: rawItemId, personId: rawPersonId, role } = req.params as {
+      id: string;
+      personId: string;
+      role: string;
+    };
+    const itemId = Number(rawItemId);
+    const personId = Number(rawPersonId);
+    if (!Number.isSafeInteger(itemId) || itemId < 1 || !Number.isSafeInteger(personId) || personId < 1) {
+      return reply.code(400).send({ error: 'invalid item or person id' });
+    }
+    if (!ITEM_PEOPLE_ROLES.has(role)) {
+      return reply.code(400).send({ error: 'role must be one of subject, author, recipient' });
+    }
+    if (!db.prepare('SELECT id FROM items WHERE id = ?').get(itemId)) {
+      return reply.code(404).send({ error: 'item not found' });
+    }
+    const result = db.prepare(
+      'DELETE FROM item_people WHERE item_id = ? AND person_id = ? AND role = ?',
+    ).run(itemId, personId, role);
+    if (result.changes === 0) return reply.code(404).send({ error: 'person tag not found' });
+    return reply.code(204).send();
+  });
+
   app.get('/api/people', () => db.prepare('SELECT * FROM people ORDER BY name').all());
 
   app.get('/api/events', () =>
@@ -224,7 +274,23 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     reply.code(201).send({ id: Number(info.lastInsertRowid), name });
   });
 
-  const MEDIA_TYPES = new Set<MediaType>(['photo', 'letter', 'article', 'audio', 'video', 'pdf']);
+  app.post('/api/people/merge', (req, reply) => {
+    const { keepId, duplicateId } = (req.body ?? {}) as {
+      keepId?: unknown;
+      duplicateId?: unknown;
+    };
+    if (!Number.isSafeInteger(keepId) || !Number.isSafeInteger(duplicateId)) {
+      return reply.code(400).send({ error: 'keepId and duplicateId must be integers' });
+    }
+    try {
+      return mergePeople(db, keepId as number, duplicateId as number);
+    } catch (err) {
+      if (err instanceof MergePeopleError) {
+        return reply.code(err.statusCode).send({ error: err.message });
+      }
+      throw err;
+    }
+  });
 
   app.post('/api/import', async (req, reply) => {
     const { paths, mediaType } = (req.body ?? {}) as { paths: unknown; mediaType: unknown };
@@ -374,6 +440,29 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     }
     try {
       return reviewGedcomGroup(db, rawGroup as ReviewGroup, rawAction as ReviewAction);
+    } catch (err) {
+      if (err instanceof GedcomReviewError) {
+        return reply.code(err.statusCode).send({ error: err.message });
+      }
+      throw err;
+    }
+  });
+
+  app.post('/api/gedcom/review/selection/:action', (req, reply) => {
+    const { action: rawAction } = req.params as { action: string };
+    const { ids } = (req.body ?? {}) as { ids?: unknown };
+    if (rawAction !== 'accept' && rawAction !== 'reject') {
+      return reply.code(400).send({ error: 'review action must be accept or reject' });
+    }
+    if (
+      !Array.isArray(ids)
+      || ids.length === 0
+      || !ids.every((id) => Number.isSafeInteger(id) && id > 0)
+    ) {
+      return reply.code(400).send({ error: 'ids must be a non-empty array of positive integers' });
+    }
+    try {
+      return reviewGedcomSelection(db, ids as number[], rawAction as ReviewAction);
     } catch (err) {
       if (err instanceof GedcomReviewError) {
         return reply.code(err.statusCode).send({ error: err.message });

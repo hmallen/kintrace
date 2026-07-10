@@ -3,8 +3,8 @@ import { useParams } from 'react-router-dom';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { PrecisionSchema } from '@shared/api.js';
-import type { ItemDetail, PatchItemBody } from '@shared/api.js';
+import { MediaTypeSchema, PrecisionSchema } from '@shared/api.js';
+import type { ItemDetail, MediaType, PatchItemBody } from '@shared/api.js';
 import { useItem, useUpdateItem } from '../api/hooks';
 import { FlagsSidebar } from '../review/FlagsSidebar';
 import {
@@ -67,6 +67,7 @@ function diffPatch(values: WorkspaceFormValues, item: ItemDetail): PatchItemBody
 }
 
 const TABS = ['diplomatic', 'normalized'] as const;
+const MEDIA_TYPES = MediaTypeSchema.options;
 type Tab = (typeof TABS)[number];
 const TAB_FIELD = {
   diplomatic: 'transcription_diplomatic',
@@ -141,6 +142,7 @@ function WorkspaceContent({ item }: { item: ItemDetail }) {
   });
   const saveMutation = useUpdateItem(item.id);
   const approveMutation = useUpdateItem(item.id);
+  const typeMutation = useUpdateItem(item.id);
 
   const pending = item.status === 'pending';
   const approve409 = approveMutation.error?.status === 409;
@@ -158,8 +160,26 @@ function WorkspaceContent({ item }: { item: ItemDetail }) {
       </div>
       <div className="workspace-review">
         <p>
-          <StatusChip status={item.status} />
+          <StatusChip status={item.status} />{' '}
+          {pending && (
+            <label>
+              Type{' '}
+              <select
+                aria-label="Item type"
+                value={item.media_type}
+                disabled={typeMutation.isPending}
+                onChange={(event) => typeMutation.mutate({
+                  media_type: event.target.value as MediaType,
+                })}
+              >
+                {MEDIA_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+              </select>
+            </label>
+          )}
         </p>
+        {typeMutation.isError && (
+          <p role="alert">Failed to change item type: {typeMutation.error.message}</p>
+        )}
         <ConfidenceBanner confidence={item.ai_confidence} aiError={item.ai_error} />
         <form onSubmit={(e) => void form.handleSubmit(onSave)(e)}>
           <TranscriptionTabs

@@ -115,11 +115,25 @@ export const GedcomReviewQueueSchema = z.object({
   })),
 });
 export type GedcomReviewQueue = z.infer<typeof GedcomReviewQueueSchema>;
+export const GedcomReviewSelectionBodySchema = z.object({
+  ids: z.array(z.number().int().positive()).min(1),
+});
+export type GedcomReviewSelectionBody = z.infer<typeof GedcomReviewSelectionBodySchema>;
 
 export const CreatePersonBodySchema = z.object({ name: z.string().min(1), notes: z.string().optional() });
 export type CreatePersonBody = z.infer<typeof CreatePersonBodySchema>;
 export const CreatePersonResultSchema = z.object({ id: z.number(), name: z.string() });
 export type CreatePersonResult = z.infer<typeof CreatePersonResultSchema>;
+
+export const MergePeopleBodySchema = z.object({
+  keepId: z.number().int().positive(),
+  duplicateId: z.number().int().positive(),
+}).refine(({ keepId, duplicateId }) => keepId !== duplicateId, {
+  message: 'keepId and duplicateId must be different',
+});
+export type MergePeopleBody = z.infer<typeof MergePeopleBodySchema>;
+export const MergePeopleResultSchema = PersonSchema;
+export type MergePeopleResult = z.infer<typeof MergePeopleResultSchema>;
 
 export const ImportResultSchema = z.union([
   z.object({ path: z.string(), itemId: z.number(), duplicate: z.boolean() }),
@@ -131,6 +145,7 @@ export const QueueResultSchema = z.object({ processed: z.number(), failed: z.num
 export type QueueResult = z.infer<typeof QueueResultSchema>;
 
 export const PatchItemBodySchema = z.object({
+  media_type: MediaTypeSchema.optional(),
   title: z.string().optional(),
   description: z.string().optional(),
   transcription_diplomatic: z.string().optional(),
