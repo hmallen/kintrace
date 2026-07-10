@@ -249,10 +249,6 @@ export function Import() {
         <>
           <div className="import-controls">
             <label>
-              <input type="checkbox" checked={autoDetect} onChange={(e) => setAutoDetect(e.target.checked)} />{' '}
-              Automatically identify PDF, audio, and video files
-            </label>
-            <label>
               {autoDetect ? 'Type to use for image files' : 'Type for every file in this batch'}{' '}
               <select
                 value={mediaType}
@@ -264,6 +260,12 @@ export function Import() {
                   </option>
                 ))}
               </select>
+            </label>
+          </div>
+          <div className="import-controls">
+            <label>
+              <input type="checkbox" checked={autoDetect} onChange={(e) => setAutoDetect(e.target.checked)} />{' '}
+              Automatically identify PDF, audio, and video files
             </label>
           </div>
           <MediaTypeImplications selected={mediaType} />
