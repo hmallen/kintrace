@@ -1,6 +1,9 @@
 import { render, screen, within } from '@testing-library/react';
+import { QueryClientProvider } from '@tanstack/react-query';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import type { ImportResult } from '@shared/api.js';
+import { makeQueryClient } from '../queryClient';
 import { Import, ImportResults } from './Import';
 
 // jsdom can't drive Uppy's real XHR upload, so specs 4-5 feed a known
@@ -11,6 +14,16 @@ const results: ImportResult[] = [
   { path: 'dupe.jpg', itemId: 3, duplicate: true },
   { path: 'broken.jpg', error: 'unsupported file type' },
 ];
+
+function renderImport() {
+  render(
+    <QueryClientProvider client={makeQueryClient()}>
+      <MemoryRouter>
+        <Import />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
 
 describe('Import', () => {
   it('renders per-file outcomes', () => {
@@ -40,11 +53,7 @@ describe('Import', () => {
   });
 
   it('media-type selector present', () => {
-    render(
-      <MemoryRouter>
-        <Import />
-      </MemoryRouter>,
-    );
+    renderImport();
 
     const selector = screen.getByRole('combobox', { name: /media type/i });
     const options = within(selector).getAllByRole('option');
@@ -56,5 +65,16 @@ describe('Import', () => {
       'video',
       'pdf',
     ]);
+  });
+
+  it('can switch to GEDCOM family tree import mode', async () => {
+    const user = userEvent.setup();
+    renderImport();
+
+    await user.click(screen.getByRole('radio', { name: /GEDCOM family tree/i }));
+
+    expect(screen.getByLabelText(/GEDCOM file/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Queue GEDCOM for review/i })).toBeDisabled();
+    expect(screen.queryByRole('combobox', { name: /media type/i })).not.toBeInTheDocument();
   });
 });

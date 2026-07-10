@@ -18,7 +18,8 @@ export const API_BASE = import.meta.env.VITE_API_BASE ?? '';
 
 async function request(path: string, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers);
-  if (init?.body != null && !headers.has('Content-Type')) {
+  const isFormData = typeof FormData !== 'undefined' && init?.body instanceof FormData;
+  if (init?.body != null && !isFormData && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });

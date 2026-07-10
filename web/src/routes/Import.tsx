@@ -4,8 +4,9 @@ import Uppy from '@uppy/core';
 import XHRUpload from '@uppy/xhr-upload';
 import Dashboard from '@uppy/react/dashboard';
 import { ImportResultSchema, MediaTypeSchema } from '@shared/api.js';
-import type { ImportResult, MediaType } from '@shared/api.js';
+import type { GedcomImportResult, ImportResult, MediaType } from '@shared/api.js';
 import { API_BASE } from '../api/client';
+import { useImportGedcom } from '../api/hooks';
 import { summarizeImport } from '../import/summarize';
 import '@uppy/core/css/style.min.css';
 import '@uppy/dashboard/css/style.min.css';
@@ -43,10 +44,38 @@ export function ImportResults({ results }: { results: ImportResult[] }) {
   );
 }
 
+export function GedcomImportResults({ result }: { result: GedcomImportResult | null }) {
+  if (result === null) return null;
+  return (
+    <section aria-label="GEDCOM import results">
+      <p>
+        {result.duplicate ? 'Already queued' : 'Queued'} GEDCOM tree for review:{' '}
+        {result.counts.peopleQueued} people, {result.counts.relationshipsQueued} relationships,{' '}
+        {result.counts.eventsQueued} events, {result.counts.warnings} warnings.{' '}
+        <Link to="/gedcom-review">Open review queue</Link>
+      </p>
+      {result.warnings.length > 0 && (
+        <ul>
+          {result.warnings.map((warning, index) => (
+            <li key={`${warning.code}-${warning.line ?? index}`}>
+              {warning.line !== undefined ? `Line ${warning.line}: ` : ''}
+              {warning.message}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 export function Import() {
+  const [mode, setMode] = useState<'media' | 'gedcom'>('media');
   const [mediaType, setMediaType] = useState<MediaType>('photo');
   const [results, setResults] = useState<ImportResult[]>([]);
+  const [gedcomFile, setGedcomFile] = useState<File | null>(null);
+  const [gedcomResult, setGedcomResult] = useState<GedcomImportResult | null>(null);
   const [responseError, setResponseError] = useState<string | null>(null);
+  const importGedcom = useImportGedcom();
 
   // The Uppy instance is created in an effect (not a useState initializer) so
   // StrictMode's mount/unmount/mount cycle never renders the Dashboard against
@@ -95,22 +124,78 @@ export function Import() {
       <h2>Import</h2>
       <div className="import-controls">
         <label>
-          Media type{' '}
-          <select
-            value={mediaType}
-            onChange={(e) => setMediaType(MediaTypeSchema.parse(e.target.value))}
-          >
-            {MEDIA_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
+          <input
+            type="radio"
+            name="import-mode"
+            checked={mode === 'media'}
+            onChange={() => setMode('media')}
+          />{' '}
+          Archival media
+        </label>{' '}
+        <label>
+          <input
+            type="radio"
+            name="import-mode"
+            checked={mode === 'gedcom'}
+            onChange={() => setMode('gedcom')}
+          />{' '}
+          GEDCOM family tree
         </label>
       </div>
-      {uppy && <Dashboard uppy={uppy} />}
+      {mode === 'media' && (
+        <>
+          <div className="import-controls">
+            <label>
+              Media type{' '}
+              <select
+                value={mediaType}
+                onChange={(e) => setMediaType(MediaTypeSchema.parse(e.target.value))}
+              >
+                {MEDIA_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {uppy && <Dashboard uppy={uppy} />}
+          <ImportResults results={results} />
+        </>
+      )}
+      {mode === 'gedcom' && (
+        <form
+          className="filter-bar"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (gedcomFile === null) return;
+            setResponseError(null);
+            setGedcomResult(null);
+            try {
+              setGedcomResult(await importGedcom.mutateAsync(gedcomFile));
+            } catch (error) {
+              setResponseError(error instanceof Error ? error.message : 'Failed to import GEDCOM.');
+            }
+          }}
+        >
+          <label>
+            GEDCOM file{' '}
+            <input
+              type="file"
+              accept=".ged,.gedcom"
+              onChange={(event) => {
+                setGedcomFile(event.currentTarget.files?.[0] ?? null);
+                setGedcomResult(null);
+              }}
+            />
+          </label>{' '}
+          <button type="submit" disabled={gedcomFile === null || importGedcom.isPending}>
+            Queue GEDCOM for review
+          </button>
+          <GedcomImportResults result={gedcomResult} />
+        </form>
+      )}
       {responseError && <p role="alert">{responseError}</p>}
-      <ImportResults results={results} />
     </section>
   );
 }

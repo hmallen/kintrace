@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import type {
   ImportResult,
+  EventSummary,
   ItemDetail,
   ItemSummary,
   Person,
@@ -34,6 +35,10 @@ export function queueProcessHandler(result: QueueResult) {
   return http.post('/api/queue/process', () => HttpResponse.json(result));
 }
 
+export function eventsHandler(events: EventSummary[]) {
+  return http.get('/api/events', () => HttpResponse.json(events));
+}
+
 // GET /api/people handler serving a fixed people list.
 export function peopleHandler(people: Person[]) {
   return http.get('/api/people', () => HttpResponse.json(people));
@@ -49,5 +54,6 @@ export const handlers = [
   http.get('/api/items/:id', () =>
     HttpResponse.json({ error: 'item not found' }, { status: 404 }),
   ),
+  eventsHandler([]),
   peopleHandler([]),
 ];

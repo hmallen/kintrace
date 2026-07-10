@@ -13,6 +13,7 @@ export function AppShell() {
           <NavLink to="/timeline">Timeline</NavLink>
           <NavLink to="/import">Import</NavLink>
           <NavLink to="/people">People</NavLink>
+          <NavLink to="/gedcom-review">GEDCOM review</NavLink>
         </nav>
         {/* Header actions slot. */}
         <div className="masthead-actions">

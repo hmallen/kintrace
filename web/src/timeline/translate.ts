@@ -1,4 +1,4 @@
-import type { ItemSummary, Precision } from '@shared/api.js';
+import type { EventSummary, ItemSummary, Precision } from '@shared/api.js';
 import { buildTimelineTooltip } from './tooltip';
 
 // Minimal HTML-escaper for text interpolated into markup vis-timeline renders
@@ -44,7 +44,7 @@ export function formatDateLabel(dateStart: string | null, precision: Precision):
 }
 
 export interface TimelineDatum {
-  id: number;
+  id: number | string;
   content: string; // formatDateLabel + title
   title: string; // buildTimelineTooltip HTML — vis renders it as the hover tooltip
   start: string; // date_start (ISO)
@@ -53,7 +53,28 @@ export interface TimelineDatum {
   className: string; // `precision-<p> status-<s>` (space-joined)
 }
 
-export function toTimelineData(items: ItemSummary[]): {
+function buildEventTimelineTooltip(event: EventSummary): string {
+  const title = escapeHtml(event.title);
+  const precision = escapeHtml(formatDateLabel(event.date_start, event.date_precision));
+  const range =
+    event.date_precision === 'exact' || event.date_end === null || event.date_end === event.date_start
+      ? (event.date_start ?? '')
+      : `${event.date_start} – ${event.date_end}`;
+  const rawDate = event.gedcom_date_raw ? `<span>GEDCOM date: ${escapeHtml(event.gedcom_date_raw)}</span>` : '';
+  const description = event.description ? `<span>${escapeHtml(event.description)}</span>` : '';
+
+  return (
+    `<div class="timeline-tooltip">` +
+    `<strong>${title}</strong>` +
+    `<span class="tooltip-precision">${precision}</span>` +
+    `<span class="tooltip-range">${escapeHtml(range)}</span>` +
+    rawDate +
+    description +
+    `</div>`
+  );
+}
+
+export function toTimelineData(items: ItemSummary[], events: EventSummary[] = []): {
   data: TimelineDatum[];
   undated: ItemSummary[];
 } {
@@ -82,6 +103,30 @@ export function toTimelineData(items: ItemSummary[]): {
         title,
         start: item.date_start,
         end: item.date_end ?? item.date_start,
+        type: 'range',
+        className,
+      });
+    }
+  }
+
+  for (const event of events) {
+    if (event.date_start === null || event.date_precision === 'unknown') continue;
+    const content = `${formatDateLabel(event.date_start, event.date_precision)} — ${escapeHtml(
+      event.title,
+    )}`;
+    const title = buildEventTimelineTooltip(event);
+    const className = `precision-${event.date_precision} source-${event.source_type ?? 'event'}`;
+    const id = `event-${event.id}`;
+
+    if (event.date_precision === 'exact') {
+      data.push({ id, content, title, start: event.date_start, type: 'point', className });
+    } else {
+      data.push({
+        id,
+        content,
+        title,
+        start: event.date_start,
+        end: event.date_end ?? event.date_start,
         type: 'range',
         className,
       });

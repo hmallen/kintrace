@@ -52,6 +52,70 @@ export type ItemDetail = z.infer<typeof ItemDetailSchema>;
 export const PersonSchema = z.object({ id: z.number(), name: z.string(), notes: z.string().nullable() });
 export type Person = z.infer<typeof PersonSchema>;
 
+export const EventSummarySchema = z.object({
+  id: z.number(),
+  title: z.string(),
+  description: z.string().nullable(),
+  date_start: z.string().nullable(),
+  date_end: z.string().nullable(),
+  date_precision: PrecisionSchema,
+  person_id: z.number().nullable(),
+  source_type: z.enum(['gedcom']).nullable(),
+  gedcom_import_id: z.number().nullable(),
+  gedcom_xref: z.string().nullable(),
+  gedcom_tag: z.string().nullable(),
+  gedcom_date_raw: z.string().nullable(),
+  source_text: z.string().nullable(),
+});
+export type EventSummary = z.infer<typeof EventSummarySchema>;
+
+export const GedcomWarningSchema = z.object({
+  line: z.number().optional(),
+  code: z.string(),
+  message: z.string(),
+});
+export type GedcomWarning = z.infer<typeof GedcomWarningSchema>;
+
+export const GedcomImportCountsSchema = z.object({
+  peopleQueued: z.number(),
+  relationshipsQueued: z.number(),
+  eventsQueued: z.number(),
+  warnings: z.number(),
+});
+export type GedcomImportCounts = z.infer<typeof GedcomImportCountsSchema>;
+
+export const GedcomImportResultSchema = z.object({
+  importId: z.number(),
+  duplicate: z.boolean(),
+  counts: GedcomImportCountsSchema,
+  warnings: z.array(GedcomWarningSchema),
+});
+export type GedcomImportResult = z.infer<typeof GedcomImportResultSchema>;
+
+export const GedcomReviewGroupSchema = z.enum(['people', 'relationships', 'events']);
+export type GedcomReviewGroup = z.infer<typeof GedcomReviewGroupSchema>;
+export const GedcomReviewStatusSchema = z.enum(['pending', 'accepted', 'rejected']);
+export type GedcomReviewStatus = z.infer<typeof GedcomReviewStatusSchema>;
+export const GedcomReviewItemSchema = z.object({
+  id: z.number(),
+  importId: z.number(),
+  group: GedcomReviewGroupSchema,
+  label: z.string(),
+  gedcomXref: z.string().nullable(),
+  payload: z.record(z.string(), z.unknown()),
+  status: GedcomReviewStatusSchema,
+  createdAt: z.string(),
+  reviewedAt: z.string().nullable(),
+});
+export type GedcomReviewItem = z.infer<typeof GedcomReviewItemSchema>;
+export const GedcomReviewQueueSchema = z.object({
+  groups: z.array(z.object({
+    group: GedcomReviewGroupSchema,
+    items: z.array(GedcomReviewItemSchema),
+  })),
+});
+export type GedcomReviewQueue = z.infer<typeof GedcomReviewQueueSchema>;
+
 export const CreatePersonBodySchema = z.object({ name: z.string().min(1), notes: z.string().optional() });
 export type CreatePersonBody = z.infer<typeof CreatePersonBodySchema>;
 export const CreatePersonResultSchema = z.object({ id: z.number(), name: z.string() });

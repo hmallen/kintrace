@@ -1,11 +1,11 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
-import type { ItemSummary } from '@shared/api.js';
+import type { EventSummary, ItemSummary } from '@shared/api.js';
 import { makeQueryClient } from '../queryClient';
 import { routes } from '../router';
 import { server } from '../test/msw';
-import { itemsHandler } from '../test/handlers';
+import { eventsHandler, itemsHandler } from '../test/handlers';
 
 // jsdom can't lay out (or click) vis-timeline's canvas-like DOM, so the real
 // Timeline is replaced with a fake that captures the handlers TimelineView
@@ -54,6 +54,24 @@ const items: ItemSummary[] = [
     status: 'reviewed',
     content_hash: 'hash2',
     thumb_path: null,
+  },
+];
+
+const events: EventSummary[] = [
+  {
+    id: 5,
+    title: 'Birth of John Smith',
+    description: null,
+    date_start: '1901-01-01',
+    date_end: '1901-12-31',
+    date_precision: 'year',
+    person_id: 1,
+    source_type: 'gedcom',
+    gedcom_import_id: 1,
+    gedcom_xref: '@I1@',
+    gedcom_tag: 'BIRT',
+    gedcom_date_raw: '1901',
+    source_text: null,
   },
 ];
 
@@ -129,5 +147,13 @@ describe('Timeline', () => {
     });
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/items/1'));
+  });
+
+  it('includes GEDCOM events on the axis', async () => {
+    server.use(itemsHandler([items[0]!]), eventsHandler(events));
+    renderAt('/timeline');
+
+    await screen.findByTestId('timeline-view');
+    expect(screen.getByTestId('timeline-view')).toHaveAttribute('data-item-count', '2');
   });
 });

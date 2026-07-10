@@ -10,12 +10,24 @@ import { importFile, type MediaType } from './importer.js';
 import { processPendingItems } from './ai/queue.js';
 import { normalizeFuzzyDate } from './dates.js';
 import type { TranscriptionEngine } from './ai/engine.js';
+import { GedcomImportError, importGedcomFile } from './gedcom/importer.js';
+import {
+  GedcomReviewError,
+  REVIEW_GROUPS,
+  listGedcomReviewQueue,
+  reviewGedcomGroup,
+  reviewGedcomItem,
+  type ReviewAction,
+  type ReviewGroup,
+} from './gedcom/review.js';
 
 export interface ServerDeps {
   db: Database.Database;
   archiveDir: string;
   cacheDir: string;
   stagingDir: string;
+  gedcomArchiveDir?: string;
+  gedcomMaxBytes?: number;
   engine: TranscriptionEngine | null;
   aiDisabledMessage?: string;
 }
@@ -192,6 +204,19 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
   app.get('/api/people', () => db.prepare('SELECT * FROM people ORDER BY name').all());
 
+  app.get('/api/events', () =>
+    db
+      .prepare(
+        `SELECT
+          id, title, description, date_start, date_end, date_precision, person_id,
+          CASE WHEN gedcom_import_id IS NULL THEN NULL ELSE 'gedcom' END AS source_type,
+          gedcom_import_id, gedcom_xref, gedcom_tag, gedcom_date_raw, source_text
+        FROM events
+        ORDER BY date_start IS NULL, date_start, title`
+      )
+      .all()
+  );
+
   app.post('/api/people', (req, reply) => {
     const { name, notes } = (req.body ?? {}) as { name?: string; notes?: string };
     if (!name) return reply.code(400).send({ error: 'name required' });
@@ -270,6 +295,90 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       return results;
     } finally {
       await Promise.all(staged.map(({ stagedPath }) => rm(stagedPath, { force: true })));
+    }
+  });
+
+  app.post('/api/gedcom/import', async (req, reply) => {
+    if (!(req as { isMultipart?: () => boolean }).isMultipart?.()) {
+      return reply.code(400).send({ error: 'GEDCOM upload requires exactly one file' });
+    }
+
+    await mkdir(deps.stagingDir, { recursive: true });
+    const staged: { filename: string; stagedPath: string }[] = [];
+    try {
+      for await (const part of req.parts()) {
+        if (part.type !== 'file') continue;
+        const unique = randomBytes(8).toString('hex');
+        const stagedPath = path.join(
+          deps.stagingDir,
+          `${unique}-${path.basename(part.filename)}`
+        );
+        await pipeline(part.file, fs.createWriteStream(stagedPath));
+        staged.push({ filename: part.filename, stagedPath });
+      }
+
+      if (staged.length !== 1) {
+        return reply.code(400).send({ error: 'GEDCOM upload requires exactly one file' });
+      }
+      const maxBytes = deps.gedcomMaxBytes ?? 25 * 1024 * 1024;
+      const stagedSize = (await fs.promises.stat(staged[0]!.stagedPath)).size;
+      if (stagedSize > maxBytes) {
+        return reply.code(413).send({ error: `GEDCOM file exceeds the ${maxBytes} byte limit` });
+      }
+
+      try {
+        const result = await importGedcomFile(deps.db, staged[0]!.stagedPath, {
+          archiveDir: deps.gedcomArchiveDir ?? path.join(deps.archiveDir, 'gedcom'),
+          originalFilename: staged[0]!.filename,
+        });
+        return reply.code(result.duplicate ? 200 : 201).send(result);
+      } catch (err) {
+        if (err instanceof GedcomImportError) {
+          return reply.code(err.statusCode).send({ error: err.message });
+        }
+        throw err;
+      }
+    } finally {
+      await Promise.all(staged.map(({ stagedPath }) => rm(stagedPath, { force: true })));
+    }
+  });
+
+  app.get('/api/gedcom/review', () => listGedcomReviewQueue(db));
+
+  app.post('/api/gedcom/review/:id/:action', (req, reply) => {
+    const { id: rawId, action: rawAction } = req.params as { id: string; action: string };
+    const id = Number(rawId);
+    if (!Number.isSafeInteger(id) || id < 1) {
+      return reply.code(400).send({ error: 'invalid review item id' });
+    }
+    if (rawAction !== 'accept' && rawAction !== 'reject') {
+      return reply.code(400).send({ error: 'review action must be accept or reject' });
+    }
+    try {
+      return reviewGedcomItem(db, id, rawAction);
+    } catch (err) {
+      if (err instanceof GedcomReviewError) {
+        return reply.code(err.statusCode).send({ error: err.message });
+      }
+      throw err;
+    }
+  });
+
+  app.post('/api/gedcom/review/groups/:group/:action', (req, reply) => {
+    const { group: rawGroup, action: rawAction } = req.params as { group: string; action: string };
+    if (!REVIEW_GROUPS.includes(rawGroup as ReviewGroup)) {
+      return reply.code(400).send({ error: 'invalid GEDCOM review group' });
+    }
+    if (rawAction !== 'accept' && rawAction !== 'reject') {
+      return reply.code(400).send({ error: 'review action must be accept or reject' });
+    }
+    try {
+      return reviewGedcomGroup(db, rawGroup as ReviewGroup, rawAction as ReviewAction);
+    } catch (err) {
+      if (err instanceof GedcomReviewError) {
+        return reply.code(err.statusCode).send({ error: err.message });
+      }
+      throw err;
     }
   });
 
