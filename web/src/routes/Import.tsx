@@ -13,6 +13,62 @@ import '@uppy/dashboard/css/style.min.css';
 
 const MEDIA_TYPES = MediaTypeSchema.options;
 
+const MEDIA_TYPE_IMPLICATIONS: Record<MediaType, { label: string; description: string }> = {
+  photo: {
+    label: 'Photo',
+    description:
+      'Treated as a photograph. AI describes the image and only transcribes visible captions or inscriptions.',
+  },
+  letter: {
+    label: 'Letter',
+    description:
+      'Treated as handwritten correspondence. AI preserves original spelling, punctuation, and line breaks.',
+  },
+  article: {
+    label: 'Article',
+    description:
+      'Treated as a newspaper or magazine clipping. AI transcribes the headline and full article text.',
+  },
+  audio: {
+    label: 'Audio',
+    description:
+      'Stored as an audio recording and opened in the audio player. Image-based AI transcription does not extract its speech.',
+  },
+  video: {
+    label: 'Video',
+    description:
+      'Stored as a video recording and opened in the video player. Image-based AI transcription does not extract its speech.',
+  },
+  pdf: {
+    label: 'PDF',
+    description:
+      'Treated as a scanned document. AI attempts to transcribe all legible text, and the original opens in the PDF viewer.',
+  },
+};
+
+export function MediaTypeImplications({ selected }: { selected: MediaType }) {
+  return (
+    <aside className="media-type-implications" aria-labelledby="media-type-implications-title">
+      <h3 id="media-type-implications-title">What this selection changes</h3>
+      <p>The document type controls how KinTrace processes and presents every file in this batch.</p>
+      <dl>
+        {MEDIA_TYPES.map((type) => {
+          const implication = MEDIA_TYPE_IMPLICATIONS[type];
+          return (
+            <div key={type} className={type === selected ? 'is-selected' : undefined}>
+              <dt>
+                {implication.label}
+                {type === selected && <span className="selected-type-label">Selected</span>}
+              </dt>
+              <dd>{implication.description}</dd>
+            </div>
+          );
+        })}
+      </dl>
+    </aside>
+  );
+}
+
 // Per-file outcomes plus the summary line. Duplicates are informational only
 // (no skip/replace prompts) — the badge links to the item already in the
 // archive; errors are shown inline without blocking the other files.
@@ -159,6 +215,7 @@ export function Import() {
               </select>
             </label>
           </div>
+          <MediaTypeImplications selected={mediaType} />
           {uppy && <Dashboard uppy={uppy} />}
           <ImportResults results={results} />
         </>

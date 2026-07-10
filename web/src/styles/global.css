@@ -469,6 +469,62 @@ label {
   margin-bottom: 1rem;
 }
 
+.media-type-implications {
+  max-width: 58rem;
+  margin: 0 0 1rem;
+  padding: 1rem;
+  background: var(--kt-paper);
+  border: 1px solid var(--kt-rule);
+  border-radius: var(--kt-radius);
+  box-shadow: var(--kt-shadow-card);
+}
+
+.media-type-implications h3,
+.media-type-implications p {
+  margin-top: 0;
+}
+
+.media-type-implications > p {
+  color: var(--kt-ink-soft);
+}
+
+.media-type-implications dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.media-type-implications dl > div {
+  padding: 0.65rem 0.75rem;
+  border-left: 3px solid var(--kt-rule);
+}
+
+.media-type-implications dl > div.is-selected {
+  background: color-mix(in srgb, var(--kt-accent) 8%, transparent);
+  border-left-color: var(--kt-accent);
+}
+
+.media-type-implications dt {
+  font-weight: 700;
+}
+
+.media-type-implications dd {
+  margin: 0.2rem 0 0;
+  color: var(--kt-ink-soft);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.selected-type-label {
+  margin-left: 0.5rem;
+  color: var(--kt-accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 /* Tune Uppy's dashboard to sit on the desk without fighting its layout. */
 .uppy-Dashboard-inner {
   background: var(--kt-paper);

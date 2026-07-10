@@ -67,6 +67,23 @@ describe('Import', () => {
     ]);
   });
 
+  it('explains the processing implications of every media type and tracks the selection', async () => {
+    const user = userEvent.setup();
+    renderImport();
+
+    const panel = screen.getByRole('complementary', { name: /what this selection changes/i });
+    expect(within(panel).getByText(/only transcribes visible captions or inscriptions/i)).toBeInTheDocument();
+    expect(within(panel).getByText(/preserves original spelling, punctuation, and line breaks/i)).toBeInTheDocument();
+    expect(within(panel).getByText(/headline and full article text/i)).toBeInTheDocument();
+    expect(within(panel).getAllByText(/does not extract its speech/i)).toHaveLength(2);
+    expect(within(panel).getByText(/original opens in the PDF viewer/i)).toBeInTheDocument();
+
+    expect(within(panel).getByText('Photo').closest('div')).toHaveClass('is-selected');
+    await user.selectOptions(screen.getByRole('combobox', { name: /media type/i }), 'letter');
+    expect(within(panel).getByText('Letter').closest('div')).toHaveClass('is-selected');
+    expect(within(panel).getByText('Photo').closest('div')).not.toHaveClass('is-selected');
+  });
+
   it('can switch to GEDCOM family tree import mode', async () => {
     const user = userEvent.setup();
     renderImport();
