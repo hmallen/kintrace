@@ -8,6 +8,8 @@ import { server } from '../test/msw';
 import { ApiError } from './client';
 import {
   useCreatePerson,
+  useImportGedcom,
+  useGedcomReviewQueue,
   useItems,
   useLinkPerson,
   usePeople,
@@ -64,6 +66,60 @@ describe('useItems', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(requestedUrl).toContain('status=transcribed');
     expect(result.current.data).toEqual([summary]);
+  });
+});
+
+describe('useImportGedcom', () => {
+  it('posts a GEDCOM file and invalidates the review queue', async () => {
+    let capturedContentType = '';
+    let reviewCalls = 0;
+    server.use(
+      http.get('/api/gedcom/review', () => {
+        reviewCalls += 1;
+        return HttpResponse.json({
+          groups: [
+            { group: 'people', items: [] },
+            { group: 'relationships', items: [] },
+            { group: 'events', items: [] },
+          ],
+        });
+      }),
+      http.post('/api/gedcom/import', async ({ request }) => {
+        capturedContentType = request.headers.get('content-type') ?? '';
+        return HttpResponse.json({
+          importId: 4,
+          duplicate: false,
+          counts: {
+            peopleQueued: 1,
+            relationshipsQueued: 0,
+            eventsQueued: 1,
+            warnings: 0,
+          },
+          warnings: [],
+        }, { status: 201 });
+      }),
+    );
+
+    const qc = makeQueryClient();
+    const { result } = renderHook(
+      () => ({
+        review: useGedcomReviewQueue(),
+        gedcom: useImportGedcom(),
+      }),
+      { wrapper: wrapperFor(qc) },
+    );
+
+    await waitFor(() => expect(result.current.review.isSuccess).toBe(true));
+    const before = reviewCalls;
+
+    await act(async () => {
+      await result.current.gedcom.mutateAsync(
+        new File(['0 HEAD\n0 @I1@ INDI'], 'family.ged', { type: 'text/plain' }),
+      );
+    });
+
+    expect(capturedContentType).toContain('multipart/form-data');
+    await waitFor(() => expect(reviewCalls).toBeGreaterThan(before));
   });
 });
 

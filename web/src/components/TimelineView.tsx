@@ -12,7 +12,7 @@ export function TimelineView({
   onSelectItem,
 }: {
   data: TimelineDatum[];
-  onSelectItem?: (id: number) => void;
+  onSelectItem?: (id: number | string) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<Timeline | null>(null);
@@ -32,7 +32,7 @@ export function TimelineView({
       // deselect). Datum ids are the numeric item ids from toTimelineData.
       timeline.on('select', (props?: { items?: Array<string | number> }) => {
         const selected = props?.items?.[0];
-        if (selected !== undefined) onSelectItemRef.current?.(Number(selected));
+        if (selected !== undefined) onSelectItemRef.current?.(selected);
       });
       timelineRef.current = timeline;
     } catch {

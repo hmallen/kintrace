@@ -1,4 +1,4 @@
-import type { ItemSummary } from '@shared/api.js';
+import type { EventSummary, ItemSummary } from '@shared/api.js';
 import { formatDateLabel, toTimelineData } from './translate';
 
 describe('formatDateLabel', () => {
@@ -35,6 +35,25 @@ function makeItem(overrides: Partial<ItemSummary>): ItemSummary {
     status: 'reviewed',
     content_hash: 'hash1',
     thumb_path: null,
+    ...overrides,
+  };
+}
+
+function makeEvent(overrides: Partial<EventSummary>): EventSummary {
+  return {
+    id: 5,
+    title: 'Birth of John Smith',
+    description: null,
+    date_start: '1901-01-01',
+    date_end: '1901-12-31',
+    date_precision: 'year',
+    person_id: 1,
+    source_type: 'gedcom',
+    gedcom_import_id: 1,
+    gedcom_xref: '@I1@',
+    gedcom_tag: 'BIRT',
+    gedcom_date_raw: '1901',
+    source_text: null,
     ...overrides,
   };
 }
@@ -125,5 +144,21 @@ describe('toTimelineData', () => {
 
     expect(data[0]!.content).toBe('1943 — &lt;b&gt;bold&lt;/b&gt;');
     expect(data[0]!.content).not.toContain('<b>');
+  });
+
+  it('maps GEDCOM events onto the same timeline without item navigation ids', () => {
+    const { data, undated } = toTimelineData([makeItem({})], [makeEvent({})]);
+
+    expect(undated).toHaveLength(0);
+    expect(data).toHaveLength(2);
+    expect(data[1]).toMatchObject({
+      id: 'event-5',
+      content: '1901 — Birth of John Smith',
+      start: '1901-01-01',
+      end: '1901-12-31',
+      type: 'range',
+    });
+    expect(data[1]!.className).toContain('source-gedcom');
+    expect(data[1]!.title).toContain('GEDCOM date: 1901');
   });
 });

@@ -13,9 +13,11 @@ const dataDir = process.env.KINTRACE_DATA ?? join(process.cwd(), 'data');
 const archiveDir = join(dataDir, 'archive');
 const cacheDir = join(dataDir, 'cache');
 const stagingDir = join(dataDir, 'staging');
+const gedcomArchiveDir = join(dataDir, 'gedcom');
 mkdirSync(archiveDir, { recursive: true });
 mkdirSync(cacheDir, { recursive: true });
 mkdirSync(stagingDir, { recursive: true });
+mkdirSync(gedcomArchiveDir, { recursive: true });
 
 const db = openDb(join(dataDir, 'kintrace.db'));
 const choice = resolveProvider(process.env);
@@ -32,7 +34,7 @@ if (choice.ok) {
   console.warn(choice.message);
 }
 
-const app = buildServer({ db, archiveDir, cacheDir, stagingDir, engine, aiDisabledMessage });
+const app = buildServer({ db, archiveDir, cacheDir, stagingDir, gedcomArchiveDir, engine, aiDisabledMessage });
 const port = Number(process.env.PORT ?? 3271);
 app.listen({ port, host: '127.0.0.1' }).then(() => {
   console.log(`KinTrace API on http://127.0.0.1:${port}`);

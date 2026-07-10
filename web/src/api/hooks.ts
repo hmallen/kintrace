@@ -10,12 +10,21 @@ import {
   ItemSummarySchema,
   PersonSchema,
   CreatePersonResultSchema,
+  EventSummarySchema,
+  GedcomImportResultSchema,
+  GedcomReviewItemSchema,
+  GedcomReviewQueueSchema,
   QueueResultSchema,
 } from '@shared/api.js';
 import type {
   ItemSummary,
   ItemDetail,
   Person,
+  EventSummary,
+  GedcomImportResult,
+  GedcomReviewGroup,
+  GedcomReviewItem,
+  GedcomReviewQueue,
   PatchItemBody,
   LinkPersonBody,
   CreatePersonBody,
@@ -61,6 +70,13 @@ export function usePeople(): UseQueryResult<Person[], ApiError> {
   return useQuery<Person[], ApiError>({
     queryKey: ['people'],
     queryFn: () => apiFetch('/api/people', PersonSchema.array()),
+  });
+}
+
+export function useEvents(): UseQueryResult<EventSummary[], ApiError> {
+  return useQuery<EventSummary[], ApiError>({
+    queryKey: ['events'],
+    queryFn: () => apiFetch('/api/events', EventSummarySchema.array()),
   });
 }
 
@@ -163,5 +179,71 @@ export function useCreatePerson(): UseMutationResult<
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['people'] });
     },
+  });
+}
+
+export function useImportGedcom(): UseMutationResult<GedcomImportResult, ApiError, File> {
+  const queryClient = useQueryClient();
+  return useMutation<GedcomImportResult, ApiError, File>({
+    mutationFn: (file) => {
+      const form = new FormData();
+      form.append('file', file);
+      return apiFetch('/api/gedcom/import', GedcomImportResultSchema, {
+        method: 'POST',
+        body: form,
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['gedcom-review'] });
+    },
+  });
+}
+
+export function useGedcomReviewQueue(): UseQueryResult<GedcomReviewQueue, ApiError> {
+  return useQuery<GedcomReviewQueue, ApiError>({
+    queryKey: ['gedcom-review'],
+    queryFn: () => apiFetch('/api/gedcom/review', GedcomReviewQueueSchema),
+  });
+}
+
+type ReviewAction = 'accept' | 'reject';
+
+async function invalidateReviewedData(queryClient: ReturnType<typeof useQueryClient>) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['gedcom-review'] }),
+    queryClient.invalidateQueries({ queryKey: ['people'] }),
+    queryClient.invalidateQueries({ queryKey: ['events'] }),
+  ]);
+}
+
+export function useReviewGedcomItem(): UseMutationResult<
+  GedcomReviewItem,
+  ApiError,
+  { id: number; action: ReviewAction }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, action }) => apiFetch(
+      `/api/gedcom/review/${id}/${action}`,
+      GedcomReviewItemSchema,
+      { method: 'POST' },
+    ),
+    onSuccess: () => invalidateReviewedData(queryClient),
+  });
+}
+
+export function useReviewGedcomGroup(): UseMutationResult<
+  GedcomReviewItem[],
+  ApiError,
+  { group: GedcomReviewGroup; action: ReviewAction }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ group, action }) => apiFetch(
+      `/api/gedcom/review/groups/${group}/${action}`,
+      GedcomReviewItemSchema.array(),
+      { method: 'POST' },
+    ),
+    onSuccess: () => invalidateReviewedData(queryClient),
   });
 }

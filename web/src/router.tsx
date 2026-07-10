@@ -7,6 +7,7 @@ import { Library } from './routes/Library';
 import { People } from './routes/People';
 import { Timeline } from './routes/Timeline';
 import { Workspace } from './routes/Workspace';
+import { GedcomReview } from './routes/GedcomReview';
 
 // Each route's primary data query runs with `throwOnError`; wrapping the route
 // element in a boundary turns a failed query into a retryable error UI (or the
@@ -25,6 +26,7 @@ export const routes: RouteObject[] = [
       { path: 'timeline', element: guarded(<Timeline />) },
       { path: 'import', element: guarded(<Import />) },
       { path: 'people', element: guarded(<People />) },
+      { path: 'gedcom-review', element: guarded(<GedcomReview />) },
     ],
   },
 ];
