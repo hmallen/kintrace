@@ -46,6 +46,7 @@ function setupItemScenario(initial: ItemDetail, people: Person[] = []) {
   let current = initial;
   const patches: PatchItemBody[] = [];
   const links: LinkPersonBody[] = [];
+  const removed: Array<{ personId: number; role: string }> = [];
   const created: unknown[] = [];
   const directory = [...people];
   let nextPersonId = 100;
@@ -79,13 +80,24 @@ function setupItemScenario(initial: ItemDetail, people: Person[] = []) {
       };
       return new HttpResponse(null, { status: 204 });
     }),
+    http.delete('/api/items/:itemId/people/:personId/:role', ({ params }) => {
+      const personId = Number(params.personId);
+      const role = String(params.role);
+      removed.push({ personId, role });
+      current = {
+        ...current,
+        people: current.people.filter((person) => !(person.id === personId && person.role === role)),
+      };
+      return new HttpResponse(null, { status: 204 });
+    }),
   );
 
-  return { patches, links, created };
+  return { patches, links, removed, created };
 }
 
 function applyServerPatch(item: ItemDetail, body: PatchItemBody): ItemDetail {
   const next: ItemDetail = { ...item };
+  if (body.media_type !== undefined) next.media_type = body.media_type;
   if (body.title !== undefined) next.title = body.title;
   if (body.description !== undefined) next.description = body.description;
   if (body.transcription_diplomatic !== undefined) {
@@ -237,6 +249,32 @@ describe('Workspace', () => {
     expect(screen.getByText(/item hasn't been transcribed yet/)).toBeInTheDocument();
   });
 
+  it('changes type for a pending queue item', async () => {
+    const { patches, qc } = await loadWorkspace({
+      ...baseItem,
+      status: 'pending',
+      media_type: 'photo',
+      transcription_diplomatic: null,
+      transcription_normalized: null,
+      ai_confidence: null,
+    });
+
+    const type = screen.getByLabelText('Item type');
+    expect(within(type).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'photo', 'letter', 'article', 'audio', 'video', 'pdf',
+    ]);
+    await userEvent.selectOptions(type, 'pdf');
+
+    await waitFor(() => expect(patches).toContainEqual({ media_type: 'pdf' }));
+    expect(await screen.findByLabelText('Item type')).toHaveValue('pdf');
+    await settled(qc);
+  });
+
+  it('does not offer type changes after processing', async () => {
+    await loadWorkspace(baseItem);
+    expect(screen.queryByLabelText('Item type')).not.toBeInTheDocument();
+  });
+
   it('approve flips status on transcribed', async () => {
     const { patches, qc } = await loadWorkspace(baseItem);
     expect(screen.getByText('transcribed')).toBeInTheDocument();
@@ -282,6 +320,26 @@ describe('Workspace', () => {
     expect(links[0]).toEqual({ personId: 5, role: 'author' });
     const chips = screen.getByTestId('people-chips');
     expect(await within(chips).findByText('Ada Lovelace')).toBeInTheDocument();
+    await settled(qc);
+  });
+
+  it('removes only the selected person role tag', async () => {
+    const tagged = {
+      ...baseItem,
+      people: [
+        { id: 5, name: 'Ada Lovelace', role: 'subject' as const },
+        { id: 5, name: 'Ada Lovelace', role: 'recipient' as const },
+      ],
+    };
+    const { removed, qc } = await loadWorkspace(tagged, [
+      { id: 5, name: 'Ada Lovelace', notes: null },
+    ]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Ada Lovelace as recipient' }));
+
+    await waitFor(() => expect(removed).toEqual([{ personId: 5, role: 'recipient' }]));
+    expect(screen.queryByRole('button', { name: 'Remove Ada Lovelace as recipient' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Ada Lovelace as subject' })).toBeInTheDocument();
     await settled(qc);
   });
 

@@ -1,14 +1,17 @@
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import type { CreatePersonBody } from '@shared/api.js';
-import { useCreatePerson, usePeople } from '../api/hooks';
+import { useCreatePerson, useMergePeople, usePeople } from '../api/hooks';
 
 export function People() {
   const { data: people, isPending } = usePeople();
   const createPerson = useCreatePerson();
+  const mergePeople = useMergePeople();
 
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
+  const [keepId, setKeepId] = useState('');
+  const [duplicateId, setDuplicateId] = useState('');
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -24,6 +27,20 @@ export function People() {
       setNotes('');
     } catch {
       // surfaced via createPerson.error below
+    }
+  }
+
+  async function handleMerge(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const keep = Number(keepId);
+    const duplicate = Number(duplicateId);
+    if (!Number.isSafeInteger(keep) || !Number.isSafeInteger(duplicate) || keep === duplicate) return;
+    try {
+      await mergePeople.mutateAsync({ keepId: keep, duplicateId: duplicate });
+      setKeepId('');
+      setDuplicateId('');
+    } catch {
+      // surfaced via mergePeople.error below
     }
   }
 
@@ -46,6 +63,48 @@ export function People() {
       </form>
       {createPerson.isError && (
         <p role="alert">Failed to create person: {createPerson.error.message}</p>
+      )}
+
+      {people && people.length > 1 && (
+        <form onSubmit={handleMerge} className="deduplicate-people">
+          <h3>Merge duplicate records</h3>
+          <p className="hint">
+            References and missing biographical details move to the person you keep.
+          </p>
+          <div className="filter-bar">
+            <label>
+              Keep{' '}
+              <select value={keepId} onChange={(event) => setKeepId(event.target.value)} required>
+                <option value="">Choose a person</option>
+                {people.map((person) => (
+                  <option key={person.id} value={person.id}>{person.name}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Merge duplicate{' '}
+              <select
+                value={duplicateId}
+                onChange={(event) => setDuplicateId(event.target.value)}
+                required
+              >
+                <option value="">Choose a duplicate</option>
+                {people.filter((person) => String(person.id) !== keepId).map((person) => (
+                  <option key={person.id} value={person.id}>{person.name}</option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="submit"
+              disabled={mergePeople.isPending || keepId === '' || duplicateId === ''}
+            >
+              Merge people
+            </button>
+          </div>
+        </form>
+      )}
+      {mergePeople.isError && (
+        <p role="alert">Failed to merge people: {mergePeople.error.message}</p>
       )}
 
       {isPending && <p>Loading people…</p>}

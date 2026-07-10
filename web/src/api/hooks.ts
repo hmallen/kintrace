@@ -10,6 +10,7 @@ import {
   ItemSummarySchema,
   PersonSchema,
   CreatePersonResultSchema,
+  MergePeopleResultSchema,
   EventSummarySchema,
   GedcomImportResultSchema,
   GedcomReviewItemSchema,
@@ -20,6 +21,7 @@ import type {
   ItemSummary,
   ItemDetail,
   Person,
+  PersonRole,
   EventSummary,
   GedcomImportResult,
   GedcomReviewGroup,
@@ -29,6 +31,8 @@ import type {
   LinkPersonBody,
   CreatePersonBody,
   CreatePersonResult,
+  MergePeopleBody,
+  MergePeopleResult,
   QueueResult,
   Status,
 } from '@shared/api.js';
@@ -82,6 +86,7 @@ export function useEvents(): UseQueryResult<EventSummary[], ApiError> {
 
 function applyPatch(prev: ItemDetail, patch: PatchItemBody): ItemDetail {
   const next: ItemDetail = { ...prev };
+  if (patch.media_type !== undefined) next.media_type = patch.media_type;
   if (patch.title !== undefined) next.title = patch.title;
   if (patch.description !== undefined) next.description = patch.description;
   if (patch.transcription_diplomatic !== undefined) {
@@ -182,6 +187,54 @@ export function useCreatePerson(): UseMutationResult<
   });
 }
 
+export function useMergePeople(): UseMutationResult<
+  MergePeopleResult,
+  ApiError,
+  MergePeopleBody
+> {
+  const queryClient = useQueryClient();
+  return useMutation<MergePeopleResult, ApiError, MergePeopleBody>({
+    mutationFn: (body) =>
+      apiFetch('/api/people/merge', MergePeopleResultSchema, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['people'] }),
+        queryClient.invalidateQueries({ queryKey: ['items'] }),
+        queryClient.invalidateQueries({ queryKey: ['item'] }),
+        queryClient.invalidateQueries({ queryKey: ['events'] }),
+      ]);
+    },
+  });
+}
+
+export function useUnlinkPerson(
+  itemId: number,
+): UseMutationResult<void, ApiError, { personId: number; role: PersonRole }> {
+  const queryClient = useQueryClient();
+  return useMutation<void, ApiError, { personId: number; role: PersonRole }>({
+    mutationFn: ({ personId, role }) =>
+      apiSend(`/api/items/${itemId}/people/${personId}/${role}`, { method: 'DELETE' }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['item', itemId] });
+      await queryClient.invalidateQueries({ queryKey: ['items'] });
+    },
+  });
+}
+
+export function useDeleteItem(): UseMutationResult<void, ApiError, number> {
+  const queryClient = useQueryClient();
+  return useMutation<void, ApiError, number>({
+    mutationFn: (itemId) => apiSend(`/api/items/${itemId}`, { method: 'DELETE' }),
+    onSuccess: async (_data, itemId) => {
+      queryClient.removeQueries({ queryKey: ['item', itemId] });
+      await queryClient.invalidateQueries({ queryKey: ['items'] });
+    },
+  });
+}
+
 export function useImportGedcom(): UseMutationResult<GedcomImportResult, ApiError, File> {
   const queryClient = useQueryClient();
   return useMutation<GedcomImportResult, ApiError, File>({
@@ -243,6 +296,22 @@ export function useReviewGedcomGroup(): UseMutationResult<
       `/api/gedcom/review/groups/${group}/${action}`,
       GedcomReviewItemSchema.array(),
       { method: 'POST' },
+    ),
+    onSuccess: () => invalidateReviewedData(queryClient),
+  });
+}
+
+export function useReviewGedcomSelection(): UseMutationResult<
+  GedcomReviewItem[],
+  ApiError,
+  { ids: number[]; action: ReviewAction }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ ids, action }) => apiFetch(
+      `/api/gedcom/review/selection/${action}`,
+      GedcomReviewItemSchema.array(),
+      { method: 'POST', body: JSON.stringify({ ids }) },
     ),
     onSuccess: () => invalidateReviewedData(queryClient),
   });

@@ -285,6 +285,16 @@ label {
   margin: 0;
 }
 
+.card-grid > li {
+  position: relative;
+}
+
+.item-delete {
+  margin-top: 0.4rem;
+  color: var(--kt-danger);
+  border-color: color-mix(in srgb, var(--kt-danger) 45%, transparent);
+}
+
 .item-card {
   display: block;
   background: var(--kt-paper);
@@ -452,6 +462,20 @@ label {
   font-size: 0.85rem;
 }
 
+.person-chip-remove {
+  border: 0;
+  padding: 0 0.1em;
+  background: transparent;
+  color: var(--kt-ink-soft);
+  line-height: 1;
+}
+
+.person-chip-remove:hover:not(:disabled) {
+  border: 0;
+  background: transparent;
+  color: var(--kt-danger);
+}
+
 .suggestion-chip {
   padding: 0 0.6em;
   margin-right: 0.3em;
@@ -480,6 +504,143 @@ label {
   border-color: var(--kt-rule);
 }
 
+/* ---- GEDCOM review ------------------------------------------------------ */
+
+.gedcom-review-page {
+  max-width: 72rem;
+}
+
+.gedcom-review-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.65rem;
+  margin: 0.75rem 0;
+  background: color-mix(in srgb, var(--kt-desk) 94%, transparent);
+  border: 1px solid var(--kt-rule);
+  border-radius: var(--kt-radius);
+  backdrop-filter: blur(6px);
+}
+
+.gedcom-selection-count {
+  margin-left: auto;
+  color: var(--kt-ink-soft);
+  font-size: 0.85rem;
+}
+
+.gedcom-review-groups {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.gedcom-review-group {
+  border: 1px solid var(--kt-rule);
+  border-radius: var(--kt-radius);
+  background: var(--kt-paper);
+}
+
+.gedcom-review-group > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0.7rem;
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+}
+
+.gedcom-review-group[open] > summary {
+  border-bottom-color: var(--kt-rule);
+}
+
+.gedcom-review-group > summary h3 {
+  display: inline;
+  margin: 0;
+}
+
+.gedcom-review-group > summary span {
+  color: var(--kt-ink-soft);
+  font-size: 0.78rem;
+}
+
+.gedcom-group-actions {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.4rem 0.7rem 0;
+}
+
+.gedcom-review-list {
+  max-height: 18rem;
+  overflow-y: auto;
+  list-style: none;
+  padding: 0;
+  margin: 0.4rem 0;
+  scrollbar-gutter: stable;
+}
+
+.gedcom-review-item {
+  display: grid;
+  grid-template-columns: auto minmax(10rem, 1fr) auto;
+  align-items: start;
+  gap: 0.45rem;
+  min-height: 2rem;
+  padding: 0.25rem 0.7rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--kt-rule) 65%, transparent);
+}
+
+.gedcom-review-item:last-child {
+  border-bottom: 0;
+}
+
+.gedcom-review-item > input {
+  margin-top: 0.28rem;
+}
+
+.gedcom-item-details > summary {
+  cursor: pointer;
+  line-height: 1.7;
+}
+
+.gedcom-item-details dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.1rem 0.6rem;
+  margin: 0.2rem 0 0.45rem;
+  font-size: 0.8rem;
+}
+
+.gedcom-item-details dl div {
+  display: contents;
+}
+
+.gedcom-item-details dt {
+  color: var(--kt-ink-soft);
+}
+
+.gedcom-item-details dd {
+  margin: 0;
+}
+
+.gedcom-item-actions {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.gedcom-item-actions button,
+.gedcom-group-actions button {
+  padding: 0.15rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+.gedcom-review-status {
+  padding-top: 0.2rem;
+  color: var(--kt-ink-soft);
+  font-size: 0.78rem;
+}
+
 /* ---- People route ------------------------------------------------------- */
 
 .person-list {
@@ -487,6 +648,24 @@ label {
   padding: 0;
   margin: 1.25rem 0 0;
   max-width: 40rem;
+}
+
+.deduplicate-people {
+  max-width: 52rem;
+  margin: 1.5rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--kt-rule);
+  border-radius: var(--kt-radius);
+  background: var(--kt-paper);
+}
+
+.deduplicate-people h3 {
+  margin-top: 0;
+}
+
+.deduplicate-people .filter-bar {
+  margin: 0.75rem 0 0;
+  flex-wrap: wrap;
 }
 
 .person-list > li {

@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { PersonRoleSchema } from '@shared/api.js';
 import type { ItemDetail, PersonRole } from '@shared/api.js';
-import { useCreatePerson, useLinkPerson, usePeople } from '../api/hooks';
+import { useCreatePerson, useLinkPerson, usePeople, useUnlinkPerson } from '../api/hooks';
 import { suggestibleNames } from '../review/aiNames';
 
 const ROLES = PersonRoleSchema.options;
@@ -9,6 +9,7 @@ const ROLES = PersonRoleSchema.options;
 export function PeoplePanel({ item }: { item: ItemDetail }) {
   const { data: people } = usePeople();
   const linkPerson = useLinkPerson(item.id);
+  const unlinkPerson = useUnlinkPerson(item.id);
   const createPerson = useCreatePerson();
   const suggestions = suggestibleNames(item.ai_names, item.people);
 
@@ -74,7 +75,17 @@ export function PeoplePanel({ item }: { item: ItemDetail }) {
               <strong>{r}:</strong>{' '}
               {members.map((p) => (
                 <span key={`${p.id}-${p.role}`} className="person-chip">
-                  {p.name}
+                  {p.name}{' '}
+                  <button
+                    type="button"
+                    className="person-chip-remove"
+                    aria-label={`Remove ${p.name} as ${p.role}`}
+                    title={`Remove ${p.role} tag`}
+                    disabled={unlinkPerson.isPending}
+                    onClick={() => unlinkPerson.mutate({ personId: p.id, role: p.role })}
+                  >
+                    ×
+                  </button>
                 </span>
               ))}
             </p>
@@ -151,6 +162,9 @@ export function PeoplePanel({ item }: { item: ItemDetail }) {
 
       {linkPerson.isError && (
         <p role="alert">Failed to link person: {linkPerson.error.message}</p>
+      )}
+      {unlinkPerson.isError && (
+        <p role="alert">Failed to remove person tag: {unlinkPerson.error.message}</p>
       )}
       {createPerson.isError && (
         <p role="alert">Failed to create person: {createPerson.error.message}</p>

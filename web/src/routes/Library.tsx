@@ -1,7 +1,7 @@
 import { Link, useSearchParams } from 'react-router-dom';
 import { StatusSchema } from '@shared/api.js';
 import type { Status } from '@shared/api.js';
-import { useItems, type ItemFilters } from '../api/hooks';
+import { useDeleteItem, useItems, type ItemFilters } from '../api/hooks';
 import { MediaTypeIcon } from '../components/MediaTypeIcon';
 import { StatusChip } from '../components/StatusChip';
 import { Thumbnail } from '../components/Thumbnail';
@@ -30,6 +30,12 @@ export function Library() {
   if (personId !== undefined) filters.personId = personId;
 
   const { data: items, isPending } = useItems(filters);
+  const deleteItem = useDeleteItem();
+
+  function handleDelete(itemId: number, title: string) {
+    if (!window.confirm(`Delete “${title}” from the library?`)) return;
+    deleteItem.mutate(itemId);
+  }
 
   function setStatusFilter(value: string) {
     const next = new URLSearchParams(searchParams);
@@ -89,10 +95,21 @@ export function Library() {
                     {formatDateLabel(item.date_start, item.date_precision)}
                   </p>
                 </Link>
+                <button
+                  type="button"
+                  className="item-delete"
+                  disabled={deleteItem.isPending}
+                  onClick={() => handleDelete(item.id, title)}
+                >
+                  Delete
+                </button>
               </li>
             );
           })}
         </ul>
+      )}
+      {deleteItem.isError && (
+        <p role="alert">Failed to delete item: {deleteItem.error.message}</p>
       )}
     </section>
   );
