@@ -390,6 +390,54 @@ label {
   gap: 1.5rem;
 }
 
+.library-person-groups,
+.library-person-subgroups {
+  display: grid;
+  gap: 1rem;
+}
+
+.library-person-group {
+  padding: 1.1rem;
+  border: 2px solid var(--kt-rule);
+  border-radius: calc(var(--kt-radius) + 4px);
+  background: color-mix(in srgb, var(--kt-paper) 58%, var(--kt-desk));
+  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.library-person-group.is-drop-target {
+  border-color: var(--kt-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--kt-accent) 24%, transparent);
+  background: color-mix(in srgb, var(--kt-accent) 8%, var(--kt-paper));
+}
+
+.library-person-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.library-person-heading h3,
+.library-document-subgroup h4 {
+  margin: 0;
+}
+
+.library-person-heading span {
+  color: var(--kt-ink-soft);
+  font-size: 0.85rem;
+}
+
+.library-document-subgroup {
+  padding: 1rem;
+  border: 1px dashed var(--kt-rule);
+  border-radius: calc(var(--kt-radius) + 2px);
+}
+
+.library-document-subgroup h4 {
+  margin-bottom: 0.9rem;
+}
+
 .library-group {
   padding: 1rem;
   border: 1px solid var(--kt-rule);
@@ -404,6 +452,14 @@ label {
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 0.9rem;
+}
+
+.library-group-heading[draggable='true'] {
+  cursor: grab;
+}
+
+.library-group-heading[draggable='true']:active {
+  cursor: grabbing;
 }
 
 .library-group-heading h3,

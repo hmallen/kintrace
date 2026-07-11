@@ -19,6 +19,28 @@ export class MergePeopleError extends Error {
   }
 }
 
+export function listLibraryPersonGroups(
+  db: Database.Database,
+): Array<{ id: number; name: string; itemIds: number[] }> {
+  const people = db.prepare('SELECT id, name FROM people ORDER BY name, id').all() as Array<{
+    id: number;
+    name: string;
+  }>;
+  const links = db.prepare(
+    'SELECT DISTINCT person_id, item_id FROM item_people ORDER BY person_id, item_id',
+  ).all() as Array<{ person_id: number; item_id: number }>;
+  const itemIdsByPerson = new Map<number, number[]>();
+  for (const link of links) {
+    const itemIds = itemIdsByPerson.get(link.person_id) ?? [];
+    itemIds.push(link.item_id);
+    itemIdsByPerson.set(link.person_id, itemIds);
+  }
+  return people.map((person) => ({
+    ...person,
+    itemIds: itemIdsByPerson.get(person.id) ?? [],
+  }));
+}
+
 function combinedNotes(kept: string | null, duplicate: string | null): string | null {
   const parts = [kept, duplicate]
     .map((value) => value?.trim())

@@ -175,6 +175,22 @@ export function addItemToGroup(
   return updated;
 }
 
+export function linkItemGroupToPerson(
+  db: Database.Database,
+  groupId: number,
+  personId: number,
+  role: 'subject' | 'author' | 'recipient',
+): void {
+  if (!getItemGroup(db, groupId)) throw new ItemGroupError(404, 'item group not found');
+  if (!db.prepare('SELECT id FROM people WHERE id = ?').get(personId)) {
+    throw new ItemGroupError(404, 'person not found');
+  }
+  db.prepare(`
+    INSERT OR IGNORE INTO item_people (item_id, person_id, role)
+    SELECT item_id, ?, ? FROM item_group_members WHERE group_id = ?
+  `).run(personId, role, groupId);
+}
+
 export function removeItemFromGroup(db: Database.Database, groupId: number, itemId: number): void {
   const result = db.prepare('DELETE FROM item_group_members WHERE group_id = ? AND item_id = ?').run(groupId, itemId);
   if (result.changes === 0) throw new ItemGroupError(404, 'group membership not found');

@@ -85,6 +85,38 @@ describe('item groups', () => {
     ]);
   });
 
+  it('lists people for library grouping and links a full subgroup to a person', async () => {
+    const first = insertItem('front.jpg', { title: 'Front' });
+    const second = insertItem('back.jpg', { title: 'Back' });
+    const personId = Number(
+      db.prepare("INSERT INTO people (name) VALUES ('Mabel Marshall')").run().lastInsertRowid,
+    );
+    const group = await app.inject({
+      method: 'POST', url: '/api/item-groups', payload: { itemIds: [first, second], label: 'Diploma' },
+    });
+
+    expect((await app.inject({ method: 'GET', url: '/api/library/people' })).json()).toEqual([
+      { id: personId, name: 'Mabel Marshall', itemIds: [] },
+    ]);
+
+    const linked = await app.inject({
+      method: 'POST',
+      url: `/api/item-groups/${group.json().id}/people`,
+      payload: { personId, role: 'subject' },
+    });
+
+    expect(linked.statusCode).toBe(204);
+    expect((await app.inject({ method: 'GET', url: '/api/library/people' })).json()).toEqual([
+      { id: personId, name: 'Mabel Marshall', itemIds: [first, second] },
+    ]);
+    expect(db.prepare(
+      'SELECT item_id, role FROM item_people WHERE person_id = ? ORDER BY item_id',
+    ).all(personId)).toEqual([
+      { item_id: first, role: 'subject' },
+      { item_id: second, role: 'subject' },
+    ]);
+  });
+
   it('keeps item titles independent through grouping, editing, and removal', async () => {
     const first = insertItem('letter-front.jpg', { title: 'Original title' });
     const second = insertItem('letter-detail.jpg', { title: 'Other title' });

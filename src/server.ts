@@ -28,7 +28,7 @@ import {
   type ReviewAction,
   type ReviewGroup,
 } from './gedcom/review.js';
-import { MergePeopleError, mergePeople } from './people.js';
+import { MergePeopleError, listLibraryPersonGroups, mergePeople } from './people.js';
 import {
   ItemGroupError,
   addItemToGroup,
@@ -36,6 +36,7 @@ import {
   getItemGroup,
   getItemGroupForItem,
   listItemGroups,
+  linkItemGroupToPerson,
   removeItemFromGroup,
   suggestItemGroupCandidates,
   updateItemGroupLabel,
@@ -43,6 +44,7 @@ import {
 import {
   AddItemGroupMemberBodySchema,
   CreateItemGroupBodySchema,
+  LinkPersonBodySchema,
   UpdateItemGroupBodySchema,
 } from '../shared/api.js';
 
@@ -202,6 +204,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
   app.get('/api/item-groups', () => listItemGroups(db));
 
+  app.get('/api/library/people', () => listLibraryPersonGroups(db));
+
   app.get('/api/item-groups/:id', (req, reply) => {
     const id = Number((req.params as { id: string }).id);
     if (!Number.isSafeInteger(id) || id < 1) return reply.code(400).send({ error: 'invalid group id' });
@@ -231,6 +235,24 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     if (!parsed.success) return reply.code(400).send({ error: 'itemId must be a positive integer' });
     try {
       return addItemToGroup(db, groupId, parsed.data.itemId);
+    } catch (err) {
+      if (err instanceof ItemGroupError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  app.post('/api/item-groups/:id/people', (req, reply) => {
+    const groupId = Number((req.params as { id: string }).id);
+    if (!Number.isSafeInteger(groupId) || groupId < 1) {
+      return reply.code(400).send({ error: 'invalid group id' });
+    }
+    const parsed = LinkPersonBodySchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return reply.code(400).send({ error: 'personId and a valid role are required' });
+    }
+    try {
+      linkItemGroupToPerson(db, groupId, parsed.data.personId, parsed.data.role);
+      return reply.code(204).send();
     } catch (err) {
       if (err instanceof ItemGroupError) return reply.code(err.statusCode).send({ error: err.message });
       throw err;

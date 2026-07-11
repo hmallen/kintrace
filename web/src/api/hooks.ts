@@ -16,6 +16,7 @@ import {
   GedcomReviewItemSchema,
   GedcomReviewQueueSchema,
   ItemGroupSchema,
+  LibraryPersonGroupSchema,
   ItemGroupSuggestionSchema,
   QueueResultSchema,
   TimelineStoryStateSchema,
@@ -31,6 +32,7 @@ import type {
   GedcomReviewItem,
   GedcomReviewQueue,
   ItemGroup,
+  LibraryPersonGroup,
   ItemGroupSuggestion,
   CreateItemGroupBody,
   UpdateItemGroupBody,
@@ -97,6 +99,13 @@ export function useItemGroups(): UseQueryResult<ItemGroup[], ApiError> {
   });
 }
 
+export function useLibraryPersonGroups(): UseQueryResult<LibraryPersonGroup[], ApiError> {
+  return useQuery<LibraryPersonGroup[], ApiError>({
+    queryKey: ['library-people'],
+    queryFn: () => apiFetch('/api/library/people', LibraryPersonGroupSchema.array()),
+  });
+}
+
 async function invalidateItemGroups(queryClient: ReturnType<typeof useQueryClient>) {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ['items'] }),
@@ -134,6 +143,26 @@ export function useAddItemToGroup(): UseMutationResult<
       { method: 'POST', body: JSON.stringify({ itemId }) },
     ),
     onSuccess: () => invalidateItemGroups(queryClient),
+  });
+}
+
+export function useLinkItemGroupToPerson(): UseMutationResult<
+  void,
+  ApiError,
+  { groupId: number; personId: number }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupId, personId }) => apiSend(`/api/item-groups/${groupId}/people`, {
+      method: 'POST',
+      body: JSON.stringify({ personId, role: 'subject' }),
+    }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['library-people'] }),
+        queryClient.invalidateQueries({ queryKey: ['item'] }),
+      ]);
+    },
   });
 }
 

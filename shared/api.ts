@@ -68,6 +68,13 @@ export type ItemDetail = z.infer<typeof ItemDetailSchema>;
 export const PersonSchema = z.object({ id: z.number(), name: z.string(), notes: z.string().nullable() });
 export type Person = z.infer<typeof PersonSchema>;
 
+export const LibraryPersonGroupSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  itemIds: z.array(z.number()),
+});
+export type LibraryPersonGroup = z.infer<typeof LibraryPersonGroupSchema>;
+
 export const EventSummarySchema = z.object({
   id: z.number(),
   title: z.string(),

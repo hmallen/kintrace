@@ -103,7 +103,7 @@ describe('Library', () => {
     const grouped = await screen.findByRole('region', { name: 'Grandpa letter views' });
     expect(within(grouped).getByText('Letter from Grandpa')).toBeInTheDocument();
     expect(within(grouped).getByText('Wedding photo')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Ungrouped items' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Unassigned' })).toBeInTheDocument();
     expect(screen.getByText('Untitled')).toBeInTheDocument();
   });
 
@@ -159,6 +159,43 @@ describe('Library', () => {
     fireEvent.drop(target, { dataTransfer });
 
     await waitFor(() => expect(addedItemId).toBe(3));
+  });
+
+  it('groups subgroups beneath people and drags a full subgroup into a person group', async () => {
+    const group: ItemGroup = {
+      id: 12,
+      label: 'Grandpa letter views',
+      createdAt: '2026-07-11 00:00:00',
+      items: items.slice(0, 2),
+    };
+    let linked: { personId: number; role: string } | undefined;
+    server.use(
+      itemsHandler(items),
+      http.get('/api/item-groups', () => HttpResponse.json([group])),
+      http.get('/api/library/people', () => HttpResponse.json([
+        { id: 7, name: 'Mabel Marshall', itemIds: [1, 2] },
+        { id: 8, name: 'Earl Marshall', itemIds: [] },
+      ])),
+      http.post('/api/item-groups/12/people', async ({ request }) => {
+        linked = await request.json() as { personId: number; role: string };
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    renderAt('/');
+
+    const mabel = await screen.findByRole('region', { name: 'Mabel Marshall' });
+    expect(within(mabel).getByRole('region', { name: 'Grandpa letter views' })).toBeInTheDocument();
+    expect(within(mabel).getByText('Letter from Grandpa')).toBeInTheDocument();
+    const earl = screen.getByRole('region', { name: 'Earl Marshall' });
+    expect(within(earl).getByText(/drop a document\/view subgroup here/i)).toBeInTheDocument();
+
+    const source = within(mabel).getByTitle('Drag this full subgroup into a person group');
+    const dataTransfer = dragDataTransfer();
+    fireEvent.dragStart(source, { dataTransfer });
+    fireEvent.dragOver(earl, { dataTransfer });
+    fireEvent.drop(earl, { dataTransfer });
+
+    await waitFor(() => expect(linked).toEqual({ personId: 8, role: 'subject' }));
   });
 
   it('status filter drives the query', async () => {

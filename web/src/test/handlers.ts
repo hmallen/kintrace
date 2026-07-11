@@ -62,6 +62,7 @@ export const handlers = [
   http.get('/api/timeline/story', () => HttpResponse.json(emptyStoryState)),
   http.get('/api/items/:id/group-suggestions', () => HttpResponse.json([])),
   http.get('/api/item-groups', () => HttpResponse.json([])),
+  http.get('/api/library/people', () => HttpResponse.json([])),
   itemsHandler([]),
   uploadHandler([]),
   queueProcessHandler({ processed: 0, failed: 0 }),
