@@ -24,6 +24,7 @@ export function TimelineControls({
   view,
   scale,
   orientation,
+  orientationLocked = false,
   people,
   personId,
   onViewChange,
@@ -34,6 +35,8 @@ export function TimelineControls({
   view: TimelineViewMode;
   scale: Scale;
   orientation: Orientation;
+  /** Narrow viewports force vertical — hide the toggle rather than lie. */
+  orientationLocked?: boolean;
   people: Person[];
   personId: number | undefined;
   onViewChange: (view: TimelineViewMode) => void;
@@ -64,6 +67,7 @@ export function TimelineControls({
               onPress={() => onScaleChange('sequential')}
             />
           </fieldset>
+          {!orientationLocked && (
           <fieldset className="control-group control-orientation">
             <legend>Orientation</legend>
             <Toggle
@@ -77,6 +81,7 @@ export function TimelineControls({
               onPress={() => onOrientationChange('vertical')}
             />
           </fieldset>
+          )}
         </>
       )}
       <label className="control-person">

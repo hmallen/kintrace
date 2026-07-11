@@ -61,6 +61,13 @@ describe('TimelineControls', () => {
     expect(handlers.onViewChange).toHaveBeenCalledWith('table');
   });
 
+  it('drops the orientation toggle when the viewport forces vertical', () => {
+    renderControls({ orientationLocked: true });
+
+    expect(screen.queryByRole('button', { name: /vertical/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /sequential/i })).toBeInTheDocument();
+  });
+
   it('hides the scale and orientation toggles outside the Explore view', () => {
     renderControls({ view: 'table' });
 

@@ -14,6 +14,7 @@ export function TimelineTable({
   undated: ItemSummary[];
 }) {
   return (
+    <div className="timeline-table-scroll">
     <table className="timeline-table">
       <caption>Timeline of archive items and life events, in date order</caption>
       <thead>
@@ -53,5 +54,6 @@ export function TimelineTable({
         ))}
       </tbody>
     </table>
+    </div>
   );
 }

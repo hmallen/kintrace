@@ -7,6 +7,7 @@ import { TimelineControls, type TimelineViewMode } from '../components/TimelineC
 import { TimelineTable } from '../components/TimelineTable';
 import { UndatedTray } from '../components/UndatedTray';
 import { clusterLayout, layoutTimeline, toEntries, type Scale } from '../timeline/layout';
+import { useMediaQuery } from '../timeline/useMediaQuery';
 import type { Orientation } from '../timeline/useVirtualWindow';
 
 const VIEWS: TimelineViewMode[] = ['explore', 'story', 'table'];
@@ -33,6 +34,9 @@ export function Timeline() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { view, scale, orientation, personId } = readParams(searchParams);
+  // Deliberate mobile layout: stacked vertical cards, not a shrunken axis.
+  const isNarrow = useMediaQuery('(max-width: 640px)');
+  const effectiveOrientation: Orientation = isNarrow ? 'vertical' : orientation;
 
   const { data: items, isPending } = useItems(personId === undefined ? {} : { personId });
   const { data: events, isPending: eventsPending } = useEvents();
@@ -68,7 +72,8 @@ export function Timeline() {
       <TimelineControls
         view={view}
         scale={scale}
-        orientation={orientation}
+        orientation={effectiveOrientation}
+        orientationLocked={isNarrow}
         people={people ?? []}
         personId={personId}
         onViewChange={(v) => setParam('view', v === 'explore' ? undefined : v)}
@@ -90,7 +95,7 @@ export function Timeline() {
             nodes={nodes}
             layout={layout}
             scale={scale}
-            orientation={orientation}
+            orientation={effectiveOrientation}
             onOpenItem={(id) => navigate(`/items/${id}`)}
           />
           <UndatedTray items={undated} />

@@ -195,6 +195,32 @@ describe('Timeline route', () => {
     expect(screen.queryByText('Birth of John Smith')).not.toBeInTheDocument();
   });
 
+  it('forces a vertical stacked layout on narrow viewports', async () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) =>
+      ({
+        matches: query.includes('max-width'),
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }) as MediaQueryList) as typeof window.matchMedia;
+    try {
+      server.use(itemsHandler([items[0]!]), eventsHandler([]));
+      renderAt('/timeline');
+
+      expect((await screen.findByTestId('explore-scroller')).className).toContain(
+        'explore-vertical',
+      );
+      expect(screen.queryByRole('button', { name: /horizontal/i })).not.toBeInTheDocument();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
   it('shows an empty state instead of a bare axis', async () => {
     server.use(itemsHandler([]), eventsHandler([]));
     renderAt('/timeline');

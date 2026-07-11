@@ -75,6 +75,8 @@ describe('ExploreTimeline', () => {
     const img = within(card).getByRole('img', { name: /Armistice photo/ });
     expect(img).toHaveAttribute('loading', 'lazy');
     expect(img).toHaveAttribute('src', '/api/items/3/thumbnail');
+    // Media type is stated, not just implied by the thumbnail (non-color cue).
+    expect(within(card).getByRole('img', { name: 'photo icon' })).toBeInTheDocument();
   });
 
   it('opens the item when its card is activated', async () => {

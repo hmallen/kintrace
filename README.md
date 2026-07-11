@@ -131,6 +131,23 @@ npm run build
 6. Use the People view to add people, then associate them with items as subjects, authors, or recipients.
 7. Use the Timeline view to see dated and undated items.
 
+## Timeline UI
+
+The Timeline route (`/timeline`) offers three views over the same `/api/items` + `/api/events` feed, switched from the controls bar. View, scale, orientation, and person filter are kept in the URL, so any configuration is shareable and back-button friendly.
+
+- **Explore** (default) - a custom virtualized axis that only renders viewport-visible entries. The **scale** toggle switches between *chronological* (positions map to real time, empty decades stay visibly empty) and *sequential* (entries evenly spaced by order, compressing gaps). The **orientation** toggle flips horizontal/vertical. Crowded stretches collapse into a cluster chip (for example `1923 · 5 items`) that expands in place. Items with `month`/`year`/`decade` precision draw their full date span with a faded or hatched bar plus a `c.`-style label; items without dates stay visible in the undated tray below the axis.
+- **Story** - a scroll-driven react-chrono narrative of the current subset with a chapter card per decade. Filter by a person first to read one life as a story.
+- **Table** - the same entries as a captioned data table (also the screen-reader fallback), including undated items.
+
+Keyboard: `Tab` reaches the controls and one timeline card; arrow keys move card-to-card along the axis, `Home`/`End` jump to the ends, and `Enter` opens the item workspace. On viewports narrower than 640px the Explore view always stacks vertically and the orientation toggle is hidden.
+
+### Building and hosting the UI
+
+`cd web && npm run build` emits static files to `web/dist/`. Serve them with any static host. Two things to keep in mind:
+
+- API origin: the app calls `/api/*` on its own origin by default. Either serve `web/dist/` behind the same origin as the backend (a reverse proxy in front of both works), or set `VITE_API_BASE=https://your-backend` at build time.
+- The backend itself does not serve the built frontend; in development the Vite dev server proxies `/api` to `http://127.0.0.1:3271`.
+
 To run AI transcription for pending items, configure the selected provider key and call the queue endpoint:
 
 ```sh

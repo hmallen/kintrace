@@ -68,6 +68,8 @@ export function StoryView({
           titleColor: '#5c5346', // --kt-ink-soft
           titleColorActive: '#6e2431',
           cardTitleColor: '#2a241e', // --kt-ink
+          glowColor: 'rgba(110, 36, 49, 0.35)', // active-card ring, accent-tinted
+          shadowColor: 'rgba(42, 36, 30, 0.18)',
         }}
       />
     </section>

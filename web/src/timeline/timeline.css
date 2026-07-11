@@ -235,6 +235,11 @@
 }
 
 .explore-card-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
   font-family: var(--kt-font-display);
   font-size: 0.92rem;
   line-height: 1.25;
@@ -276,7 +281,21 @@
   white-space: nowrap;
 }
 
-/* Cluster chip: a bundled stack awaiting expansion. */
+/* Cluster chip: a bundled stack awaiting expansion. It stays mounted while
+   expanded (as the collapse control), so lift it above the member cards and
+   into the axis gap like a tag pinned to the group. */
+.explore-node.explore-cluster {
+  z-index: 1;
+}
+
+.explore-horizontal .explore-cluster {
+  transform: translateY(-18px);
+}
+
+.explore-vertical .explore-cluster {
+  transform: translateX(-18px);
+}
+
 .explore-cluster-chip {
   padding: 0.45rem 0.8rem;
   border: 1px solid var(--kt-rule);
@@ -425,4 +444,60 @@
   border-radius: var(--kt-radius);
   color: var(--kt-ink-soft);
   background: color-mix(in srgb, var(--kt-paper) 55%, transparent);
+}
+
+.explore-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* ---- Story view (react-chrono) ------------------------------------------ */
+/* The Theme prop doesn't cover chrono's card borders/subtitle blues; bring
+   those onto the desk palette, scoped so nothing leaks past Story mode. */
+
+.story-view .timeline-card-content.rc-card,
+.story-view .card-media-wrapper {
+  border-color: var(--kt-rule);
+}
+
+.story-view .timeline-card-content.rc-card {
+  background: var(--kt-mat);
+  box-shadow: var(--kt-shadow-card);
+}
+
+.story-view .timeline-card-content.rc-card.active {
+  border-color: var(--kt-accent);
+}
+
+.story-view .rc-card-subtitle {
+  color: var(--kt-ink-soft);
+}
+
+/* Wide tables scroll inside their own container, never the page body. */
+.timeline-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* ---- Narrow viewports --------------------------------------------------- */
+/* Deliberate mobile layout: the route forces vertical orientation ≤640px
+   (stacked cards down the page); here the chrome adapts around that. */
+
+@media (max-width: 640px) {
+  .timeline-controls {
+    gap: 0.6rem;
+  }
+
+  .control-toggle {
+    padding: 0.5rem 0.6rem; /* keep touch targets comfortable */
+  }
+
+  .explore-vertical {
+    max-height: none; /* the page scrolls; no nested scroll trap on touch */
+  }
+
+  .explore-card {
+    width: 148px;
+  }
 }

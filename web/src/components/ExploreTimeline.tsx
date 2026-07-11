@@ -6,6 +6,7 @@ import type {
   TimelineNode,
 } from '../timeline/layout';
 import { useVirtualWindow, type Orientation } from '../timeline/useVirtualWindow';
+import { MediaTypeIcon } from './MediaTypeIcon';
 import { StatusChip } from './StatusChip';
 import { Thumbnail } from './Thumbnail';
 import '../timeline/timeline.css';
@@ -14,7 +15,9 @@ import '../timeline/timeline.css';
 // the main axis, so windowing keeps a node alive until its whole card is out.
 const NODE_OVERHANG_PX = 240;
 const AXIS_PX = 44; // rail + tick labels
-const LANE_MAIN_PX = { horizontal: 158, vertical: 236 } as const;
+// Card height is deterministic (thumb 84 + two clamped title lines + date +
+// meta + padding ≈ 196px), so lanes can pack without overlap.
+const LANE_MAIN_PX = { horizontal: 212, vertical: 236 } as const;
 const CANVAS_PAD_PX = 260; // trailing room so the last card is never clipped
 
 function nodeStart(node: TimelineNode): number {
@@ -205,6 +208,7 @@ export function ExploreTimeline({
                 <button
                   type="button"
                   className="explore-card explore-focusable"
+                  title={entry.title}
                   tabIndex={activeKey === entry.key ? 0 : -1}
                   onFocus={() => setFocusKey(entry.key)}
                   onClick={() => onOpenItem(entry.id)}
@@ -217,7 +221,10 @@ export function ExploreTimeline({
                   />
                   <span className="explore-card-title">{entry.title}</span>
                   <span className="explore-node-date">{entry.dateLabel}</span>
-                  <StatusChip status={entry.status ?? 'pending'} />
+                  <span className="explore-card-meta">
+                    <MediaTypeIcon type={entry.mediaType ?? 'photo'} />
+                    <StatusChip status={entry.status ?? 'pending'} />
+                  </span>
                 </button>
               </li>
             );
