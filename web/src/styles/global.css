@@ -211,6 +211,29 @@ label {
   padding: 2rem;
 }
 
+/* Narrow screens: the masthead wraps instead of forcing the page wide
+   (WCAG 1.4.10 — no horizontal body scroll). */
+@media (max-width: 640px) {
+  .masthead {
+    flex-wrap: wrap;
+    gap: 0.4rem 1.25rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .masthead-nav {
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+  }
+
+  .masthead-actions {
+    margin-left: 0;
+  }
+
+  .page {
+    padding: 1rem;
+  }
+}
+
 /* ---- Catalog stamps: status + confidence + media type ------------------- */
 
 .status-chip,

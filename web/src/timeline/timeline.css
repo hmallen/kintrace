@@ -1,103 +1,12 @@
 /*
- * Timeline precision + status encoding.
+ * Timeline styles: the Explore renderer, its controls, the table fallback,
+ * and the undated tray.
  *
- * vis-timeline stamps TimelineDatum.className ("precision-<p> status-<s>",
- * from toTimelineData) onto its .vis-item elements — for point items that
- * includes the companion .vis-dot element — so everything here composes with
- * vis-timeline's own classes.
- *
- * Hues come from the archival status tokens in theme.css, shared with the
- * status chips so the encoding reads the same everywhere.
+ * Precision + status encoding: each status class sets --kt-item-color (hues
+ * from theme.css, shared with the status chips) and each precision pairs its
+ * hue with a non-color cue — solid bar (exact), edge fade (month/year),
+ * diagonal hatch (decade) — plus the "c." date label on the card.
  */
-
-/* The axis itself sits on the desk; quiet warm rules. */
-.vis-timeline {
-  border-color: var(--kt-rule);
-  background: var(--kt-paper);
-  font-family: var(--kt-font-ui);
-}
-
-.vis-panel.vis-center,
-.vis-panel.vis-left,
-.vis-panel.vis-right,
-.vis-panel.vis-top,
-.vis-panel.vis-bottom {
-  border-color: var(--kt-rule);
-}
-
-.vis-time-axis .vis-text {
-  color: var(--kt-ink-soft);
-}
-
-.vis-time-axis .vis-grid.vis-minor,
-.vis-time-axis .vis-grid.vis-major {
-  border-color: color-mix(in srgb, var(--kt-rule) 60%, transparent);
-}
-
-/* ---- Status tints ------------------------------------------------------ */
-/* Each status sets the hue the precision shapes draw with, so status and
-   precision compose freely (any precision × any status). */
-
-.vis-item {
-  --kt-item-color: var(--kt-ink-soft); /* fallback if no status class present */
-  color: inherit;
-  font-size: 0.8rem;
-}
-
-.vis-item.status-pending {
-  --kt-item-color: var(--kt-status-pending); /* ochre — needs transcription */
-}
-
-.vis-item.status-transcribed {
-  --kt-item-color: var(--kt-status-transcribed); /* slate ink — unverified */
-}
-
-.vis-item.status-reviewed {
-  --kt-item-color: var(--kt-status-reviewed); /* bottle green — verified */
-}
-
-/* ---- Precision shapes -------------------------------------------------- */
-
-/* exact → point marker: a filled dot in the status hue (was a hollow ring —
-   too faint against the desk). */
-.vis-item.vis-dot.precision-exact {
-  border-color: var(--kt-item-color);
-  background: var(--kt-item-color);
-}
-
-.vis-item.vis-point.precision-exact {
-  background: transparent;
-  border: none;
-}
-
-/* month / year → range bar: solid ink center (label set in paper so it stays
-   legible on the fill), gradient-faded left/right edges expressing the fuzz. */
-.vis-item.vis-range.precision-month,
-.vis-item.vis-range.precision-year {
-  border: none;
-  border-radius: 3px;
-  color: var(--kt-paper);
-  background: linear-gradient(
-    to right,
-    transparent,
-    var(--kt-item-color) 14px,
-    var(--kt-item-color) calc(100% - 14px),
-    transparent
-  );
-}
-
-/* decade → diagonal-hatched translucent bar: reads as "somewhere in here". */
-.vis-item.vis-range.precision-decade {
-  border: 1px dashed color-mix(in srgb, var(--kt-item-color) 50%, transparent);
-  border-radius: 3px;
-  background: repeating-linear-gradient(
-    45deg,
-    color-mix(in srgb, var(--kt-item-color) 30%, transparent) 0,
-    color-mix(in srgb, var(--kt-item-color) 30%, transparent) 6px,
-    transparent 6px,
-    transparent 12px
-  );
-}
 
 /* ---- Undated tray ------------------------------------------------------ */
 
@@ -135,4 +44,460 @@
 .undated-tray a:hover {
   border-color: var(--kt-accent);
   color: var(--kt-accent);
+}
+
+/* ---- Explore view ------------------------------------------------------ */
+/* Custom virtualized renderer: prints pinned along an archival rule. The
+   axis is a stamped measuring rule; items are small paper prints whose
+   uncertainty spans fade into the desk. Status hues reuse --kt-item-color
+   exactly like the chips, and precision is always paired with a non-color
+   cue (fade, hatch, dot) plus the "c." label. */
+
+.explore-scroller {
+  position: relative;
+  overflow: auto;
+  border: 1px solid var(--kt-rule);
+  border-radius: var(--kt-radius);
+  background:
+    linear-gradient(color-mix(in srgb, var(--kt-paper) 40%, transparent), transparent 120px),
+    var(--kt-desk);
+}
+
+.explore-horizontal {
+  max-height: 70vh;
+}
+
+.explore-vertical {
+  max-height: 75vh;
+}
+
+.explore-canvas {
+  position: relative;
+}
+
+/* The rule: a stamped edge the ticks sit on. */
+.explore-axis {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.explore-horizontal .explore-axis {
+  border-top: 2px solid var(--kt-rule);
+}
+
+.explore-vertical .explore-axis {
+  border-left: 2px solid var(--kt-rule);
+}
+
+.explore-tick {
+  position: absolute;
+  font-family: var(--kt-font-display);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  color: var(--kt-ink-soft);
+  padding: 0.15rem 0.35rem;
+}
+
+.explore-horizontal .explore-tick {
+  top: 0;
+  border-left: 1px solid var(--kt-rule);
+}
+
+.explore-vertical .explore-tick {
+  left: 0;
+  border-top: 1px solid var(--kt-rule);
+}
+
+.explore-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.explore-node {
+  --kt-item-color: var(--kt-ink-soft);
+  position: absolute;
+  transition: left 0.35s ease, top 0.35s ease;
+}
+
+.explore-node.status-pending {
+  --kt-item-color: var(--kt-status-pending);
+}
+
+.explore-node.status-transcribed {
+  --kt-item-color: var(--kt-status-transcribed);
+}
+
+.explore-node.status-reviewed {
+  --kt-item-color: var(--kt-status-reviewed);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .explore-node {
+    transition: none;
+  }
+}
+
+/* Uncertainty span: the bar under/beside the card showing the full extent. */
+.explore-span {
+  position: absolute;
+  display: block;
+  border-radius: 3px;
+  background: var(--kt-item-color);
+}
+
+.explore-horizontal .explore-span {
+  top: -8px;
+  height: 6px;
+  min-width: 6px;
+}
+
+.explore-vertical .explore-span {
+  left: -8px;
+  width: 6px;
+  min-height: 6px;
+}
+
+/* month / year → fade both edges: "somewhere in this stretch". */
+.explore-node.precision-month .explore-span,
+.explore-node.precision-year .explore-span {
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--kt-item-color) 12px,
+    var(--kt-item-color) calc(100% - 12px),
+    transparent
+  );
+}
+
+.explore-vertical .explore-node.precision-month .explore-span,
+.explore-vertical .explore-node.precision-year .explore-span {
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--kt-item-color) 12px,
+    var(--kt-item-color) calc(100% - 12px),
+    transparent
+  );
+}
+
+/* decade → diagonal hatch, dashed edge: the widest uncertainty. */
+.explore-node.precision-decade .explore-span {
+  border: 1px dashed color-mix(in srgb, var(--kt-item-color) 55%, transparent);
+  background: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--kt-item-color) 35%, transparent) 0,
+    color-mix(in srgb, var(--kt-item-color) 35%, transparent) 5px,
+    transparent 5px,
+    transparent 10px
+  );
+}
+
+/* Item card: a small print laid on the desk. */
+.explore-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  width: 172px;
+  padding: 0.5rem 0.55rem 0.55rem;
+  border: 1px solid var(--kt-rule);
+  border-left: 3px solid var(--kt-item-color);
+  border-radius: var(--kt-radius);
+  background: var(--kt-mat);
+  box-shadow: var(--kt-shadow-card);
+  font: inherit;
+  text-align: left;
+  color: var(--kt-ink);
+  cursor: pointer;
+}
+
+.explore-card:hover {
+  box-shadow: var(--kt-shadow-card-hover);
+  border-color: var(--kt-accent);
+}
+
+.explore-card .thumb,
+.explore-card .thumb-fallback {
+  width: 100%;
+  height: 84px;
+  object-fit: cover;
+  border-radius: 2px;
+  background: var(--kt-desk);
+}
+
+.explore-card .thumb-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--kt-ink-soft);
+}
+
+.explore-card-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-family: var(--kt-font-display);
+  font-size: 0.92rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.explore-node-date {
+  font-size: 0.78rem;
+  color: var(--kt-ink-soft);
+  letter-spacing: 0.03em;
+}
+
+/* GEDCOM/life events: a slim milestone flag, not a print. */
+.explore-milestone {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.25rem 0.5rem;
+  max-width: 220px;
+  border: 1px solid var(--kt-rule);
+  border-radius: 999px;
+  background: var(--kt-paper);
+  font-size: 0.82rem;
+  color: var(--kt-ink);
+}
+
+.explore-milestone-marker {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  align-self: center;
+  transform: rotate(45deg);
+  background: var(--kt-ink-soft);
+}
+
+.explore-milestone-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Cluster chip: a bundled stack awaiting expansion. It stays mounted while
+   expanded (as the collapse control), so lift it above the member cards and
+   into the axis gap like a tag pinned to the group. */
+.explore-node.explore-cluster {
+  z-index: 1;
+}
+
+.explore-horizontal .explore-cluster {
+  transform: translateY(-18px);
+}
+
+.explore-vertical .explore-cluster {
+  transform: translateX(-18px);
+}
+
+.explore-cluster-chip {
+  padding: 0.45rem 0.8rem;
+  border: 1px solid var(--kt-rule);
+  border-radius: 999px;
+  background: var(--kt-paper);
+  box-shadow: var(--kt-shadow-card), 2px 2px 0 0 var(--kt-paper), 3px 3px 0 0 var(--kt-rule);
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--kt-ink);
+  cursor: pointer;
+}
+
+.explore-cluster-chip:hover {
+  border-color: var(--kt-accent);
+  color: var(--kt-accent);
+}
+
+.explore-cluster-chip[aria-expanded='true'] {
+  background: var(--kt-accent-wash);
+  border-color: var(--kt-accent);
+}
+
+/* Focus: the one accent, thick enough to survive high zoom. */
+.explore-focusable:focus-visible {
+  outline: 3px solid var(--kt-accent);
+  outline-offset: 2px;
+}
+
+/* ---- Controls bar ------------------------------------------------------ */
+
+.timeline-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.9rem;
+  margin: 0 0 1rem;
+}
+
+.control-group {
+  display: flex;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.control-group legend {
+  padding: 0 0 0.25rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--kt-ink-soft);
+}
+
+.control-toggle {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--kt-rule);
+  background: var(--kt-paper);
+  color: var(--kt-ink);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.control-toggle + .control-toggle {
+  border-left: none;
+}
+
+.control-toggle:first-of-type {
+  border-radius: var(--kt-radius) 0 0 var(--kt-radius);
+}
+
+.control-toggle:last-of-type {
+  border-radius: 0 var(--kt-radius) var(--kt-radius) 0;
+}
+
+.control-toggle[aria-pressed='true'] {
+  background: var(--kt-accent);
+  border-color: var(--kt-accent);
+  color: var(--kt-paper);
+}
+
+.control-toggle:hover:not([aria-pressed='true']) {
+  background: var(--kt-accent-wash);
+}
+
+.control-toggle:focus-visible,
+.control-person select:focus-visible {
+  outline: 3px solid var(--kt-accent);
+  outline-offset: 2px;
+}
+
+.control-person {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--kt-ink-soft);
+}
+
+.control-person select {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--kt-rule);
+  border-radius: var(--kt-radius);
+  background: var(--kt-paper);
+  color: var(--kt-ink);
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+/* ---- Table fallback ---------------------------------------------------- */
+
+.timeline-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--kt-paper);
+  border: 1px solid var(--kt-rule);
+}
+
+.timeline-table caption {
+  padding: 0.5rem;
+  font-style: italic;
+  color: var(--kt-ink-soft);
+  caption-side: top;
+  text-align: left;
+}
+
+.timeline-table th,
+.timeline-table td {
+  padding: 0.45rem 0.7rem;
+  border-bottom: 1px solid var(--kt-rule);
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.timeline-table th {
+  font-family: var(--kt-font-display);
+  letter-spacing: 0.04em;
+}
+
+.timeline-empty {
+  padding: 1.5rem;
+  border: 1px dashed var(--kt-rule);
+  border-radius: var(--kt-radius);
+  color: var(--kt-ink-soft);
+  background: color-mix(in srgb, var(--kt-paper) 55%, transparent);
+}
+
+.explore-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* ---- Story view (react-chrono) ------------------------------------------ */
+/* The Theme prop doesn't cover chrono's card borders/subtitle blues; bring
+   those onto the desk palette, scoped so nothing leaks past Story mode. */
+
+.story-view .timeline-card-content.rc-card,
+.story-view .card-media-wrapper {
+  border-color: var(--kt-rule);
+}
+
+.story-view .timeline-card-content.rc-card {
+  background: var(--kt-mat);
+  box-shadow: var(--kt-shadow-card);
+}
+
+.story-view .timeline-card-content.rc-card.active {
+  border-color: var(--kt-accent);
+}
+
+.story-view .rc-card-subtitle {
+  color: var(--kt-ink-soft);
+}
+
+/* Wide tables scroll inside their own container, never the page body. */
+.timeline-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* ---- Narrow viewports --------------------------------------------------- */
+/* Deliberate mobile layout: the route forces vertical orientation ≤640px
+   (stacked cards down the page); here the chrome adapts around that. */
+
+@media (max-width: 640px) {
+  .timeline-controls {
+    gap: 0.6rem;
+  }
+
+  .control-toggle {
+    padding: 0.5rem 0.6rem; /* keep touch targets comfortable */
+  }
+
+  .explore-vertical {
+    max-height: none; /* the page scrolls; no nested scroll trap on touch */
+  }
+
+  .explore-card {
+    width: 148px;
+  }
 }

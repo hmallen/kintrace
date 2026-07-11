@@ -1,6 +1,10 @@
 // Self-hosted Fraunces (OFL) — bundled woff2 via @fontsource, no CDN requests.
 import '@fontsource/fraunces/latin-500.css';
 import '@fontsource/fraunces/latin-600.css';
+// react-chrono's stylesheet includes a global reset; load it FIRST so the
+// KinTrace globals below win the cascade on shared element selectors while
+// chrono's class-scoped component styles keep working (used by StoryView).
+import 'react-chrono/dist/style.css';
 import './styles/theme.css';
 import './styles/global.css';
 import { StrictMode } from 'react';

@@ -20,11 +20,10 @@
     "@uppy/react": "^5.2.0",
     "@uppy/xhr-upload": "^5.2.0",
     "react": "^19.2.7",
+    "react-chrono": "^3.3.3",
     "react-dom": "^19.2.7",
     "react-hook-form": "^7.81.0",
     "react-router-dom": "^7.18.1",
-    "vis-data": "^8.0.4",
-    "vis-timeline": "^8.5.1",
     "zod": "^4.4.3",
     "zustand": "^5.0.14"
   },
