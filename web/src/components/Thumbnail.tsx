@@ -8,9 +8,11 @@ export interface ThumbnailProps {
   alt: string;
   /** Drives the icon fallback when the thumbnail is missing (backend 404s). */
   mediaType: MediaType;
+  /** Pass 'lazy' in long virtualized lists; defaults to the browser's eager load. */
+  loading?: 'lazy' | 'eager';
 }
 
-export function Thumbnail({ itemId, alt, mediaType }: ThumbnailProps) {
+export function Thumbnail({ itemId, alt, mediaType, loading }: ThumbnailProps) {
   const [failed, setFailed] = useState(false);
 
   if (failed) {
@@ -25,6 +27,7 @@ export function Thumbnail({ itemId, alt, mediaType }: ThumbnailProps) {
     <img
       src={`${API_BASE}/api/items/${itemId}/thumbnail`}
       alt={alt}
+      loading={loading}
       onError={() => setFailed(true)}
       className="thumb"
     />
