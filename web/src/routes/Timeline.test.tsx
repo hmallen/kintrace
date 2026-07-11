@@ -169,6 +169,32 @@ describe('Timeline route', () => {
     expect(screen.queryByTestId('explore-scroller')).not.toBeInTheDocument();
   });
 
+  it('tells a scroll-driven story with decade chapters in Story view', async () => {
+    server.use(itemsHandler([items[0]!]), eventsHandler([]));
+    renderAt('/timeline?view=story');
+
+    expect(await screen.findByText('The 1940s')).toBeInTheDocument();
+    expect(screen.getByText('Letter from Grandpa')).toBeInTheDocument();
+    expect(screen.queryByTestId('explore-scroller')).not.toBeInTheDocument();
+  });
+
+  it('scopes Story mode to the selected person, events included', async () => {
+    server.use(
+      http.get('/api/items', ({ request }) => {
+        const personId = new URL(request.url).searchParams.get('personId');
+        return HttpResponse.json(personId === '3' ? [adaItem] : items);
+      }),
+      eventsHandler([{ ...events[0]!, person_id: 1 }]),
+      peopleHandler(people),
+    );
+    renderAt('/timeline?view=story&personId=3');
+
+    expect(await screen.findByText('Ada portrait')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Ada Voss/ })).toBeInTheDocument();
+    // The event belongs to person 1, not the filtered person 3.
+    expect(screen.queryByText('Birth of John Smith')).not.toBeInTheDocument();
+  });
+
   it('shows an empty state instead of a bare axis', async () => {
     server.use(itemsHandler([]), eventsHandler([]));
     renderAt('/timeline');

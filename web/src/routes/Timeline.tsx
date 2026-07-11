@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useEvents, useItems, usePeople } from '../api/hooks';
 import { ExploreTimeline } from '../components/ExploreTimeline';
+import { StoryView } from '../components/StoryView';
 import { TimelineControls, type TimelineViewMode } from '../components/TimelineControls';
 import { TimelineTable } from '../components/TimelineTable';
 import { UndatedTray } from '../components/UndatedTray';
@@ -37,9 +38,14 @@ export function Timeline() {
   const { data: events, isPending: eventsPending } = useEvents();
   const { data: people } = usePeople();
 
+  // The person filter scopes events too — the API only filters items.
+  const visibleEvents = useMemo(() => {
+    const all = events ?? [];
+    return personId === undefined ? all : all.filter((e) => e.person_id === personId);
+  }, [events, personId]);
   const { entries, undated } = useMemo(
-    () => toEntries(items ?? [], events ?? []),
-    [events, items],
+    () => toEntries(items ?? [], visibleEvents),
+    [items, visibleEvents],
   );
   const layout = useMemo(() => layoutTimeline(entries, scale), [entries, scale]);
   const nodes = useMemo(() => clusterLayout(layout), [layout]);
@@ -94,7 +100,14 @@ export function Timeline() {
         <TimelineTable entries={entries} undated={undated} />
       )}
       {!loading && !empty && view === 'story' && (
-        <p className="timeline-empty">Story mode is coming in the next step.</p>
+        <StoryView
+          entries={entries}
+          heading={
+            personId === undefined
+              ? 'The whole archive'
+              : `${people?.find((p) => p.id === personId)?.name ?? 'One person'}’s story`
+          }
+        />
       )}
     </section>
   );
