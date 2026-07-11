@@ -15,7 +15,10 @@ import {
   GedcomImportResultSchema,
   GedcomReviewItemSchema,
   GedcomReviewQueueSchema,
+  ItemGroupSchema,
+  ItemGroupSuggestionSchema,
   QueueResultSchema,
+  TimelineStoryStateSchema,
 } from '@shared/api.js';
 import type {
   ItemSummary,
@@ -27,6 +30,10 @@ import type {
   GedcomReviewGroup,
   GedcomReviewItem,
   GedcomReviewQueue,
+  ItemGroup,
+  ItemGroupSuggestion,
+  CreateItemGroupBody,
+  UpdateItemGroupBody,
   PatchItemBody,
   LinkPersonBody,
   CreatePersonBody,
@@ -35,6 +42,7 @@ import type {
   MergePeopleResult,
   QueueResult,
   Status,
+  TimelineStoryState,
 } from '@shared/api.js';
 import { ApiError, apiFetch, apiSend } from './client';
 import { useQueueStore } from '../stores/queue';
@@ -70,6 +78,95 @@ export function useItem(id: number): UseQueryResult<ItemDetail, ApiError> {
   });
 }
 
+export function useItemGroupSuggestions(
+  itemId: number,
+): UseQueryResult<ItemGroupSuggestion[], ApiError> {
+  return useQuery<ItemGroupSuggestion[], ApiError>({
+    queryKey: ['item-group-suggestions', itemId],
+    queryFn: () => apiFetch(
+      `/api/items/${itemId}/group-suggestions`,
+      ItemGroupSuggestionSchema.array(),
+    ),
+  });
+}
+
+export function useItemGroups(): UseQueryResult<ItemGroup[], ApiError> {
+  return useQuery<ItemGroup[], ApiError>({
+    queryKey: ['item-groups'],
+    queryFn: () => apiFetch('/api/item-groups', ItemGroupSchema.array()),
+  });
+}
+
+async function invalidateItemGroups(queryClient: ReturnType<typeof useQueryClient>) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['items'] }),
+    queryClient.invalidateQueries({ queryKey: ['item'] }),
+    queryClient.invalidateQueries({ queryKey: ['item-groups'] }),
+    queryClient.invalidateQueries({ queryKey: ['item-group-suggestions'] }),
+  ]);
+}
+
+export function useCreateItemGroup(): UseMutationResult<
+  ItemGroup,
+  ApiError,
+  CreateItemGroupBody
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body) => apiFetch('/api/item-groups', ItemGroupSchema, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+    onSuccess: () => invalidateItemGroups(queryClient),
+  });
+}
+
+export function useAddItemToGroup(): UseMutationResult<
+  ItemGroup,
+  ApiError,
+  { groupId: number; itemId: number }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupId, itemId }) => apiFetch(
+      `/api/item-groups/${groupId}/items`,
+      ItemGroupSchema,
+      { method: 'POST', body: JSON.stringify({ itemId }) },
+    ),
+    onSuccess: () => invalidateItemGroups(queryClient),
+  });
+}
+
+export function useRemoveItemFromGroup(): UseMutationResult<
+  void,
+  ApiError,
+  { groupId: number; itemId: number }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupId, itemId }) => apiSend(
+      `/api/item-groups/${groupId}/items/${itemId}`,
+      { method: 'DELETE' },
+    ),
+    onSuccess: () => invalidateItemGroups(queryClient),
+  });
+}
+
+export function useUpdateItemGroup(): UseMutationResult<
+  ItemGroup,
+  ApiError,
+  { groupId: number; body: UpdateItemGroupBody }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ groupId, body }) => apiFetch(`/api/item-groups/${groupId}`, ItemGroupSchema, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+    onSuccess: () => invalidateItemGroups(queryClient),
+  });
+}
+
 export function usePeople(): UseQueryResult<Person[], ApiError> {
   return useQuery<Person[], ApiError>({
     queryKey: ['people'],
@@ -81,6 +178,23 @@ export function useEvents(): UseQueryResult<EventSummary[], ApiError> {
   return useQuery<EventSummary[], ApiError>({
     queryKey: ['events'],
     queryFn: () => apiFetch('/api/events', EventSummarySchema.array()),
+  });
+}
+
+export function useTimelineStory(): UseQueryResult<TimelineStoryState, ApiError> {
+  return useQuery<TimelineStoryState, ApiError>({
+    queryKey: ['timeline-story'],
+    queryFn: () => apiFetch('/api/timeline/story', TimelineStoryStateSchema),
+  });
+}
+
+export function useGenerateTimelineStory(): UseMutationResult<TimelineStoryState, ApiError, void> {
+  const queryClient = useQueryClient();
+  return useMutation<TimelineStoryState, ApiError, void>({
+    mutationFn: () => apiFetch('/api/timeline/story', TimelineStoryStateSchema, { method: 'POST' }),
+    onSuccess: (state) => {
+      queryClient.setQueryData(['timeline-story'], state);
+    },
   });
 }
 
@@ -230,7 +344,10 @@ export function useDeleteItem(): UseMutationResult<void, ApiError, number> {
     mutationFn: (itemId) => apiSend(`/api/items/${itemId}`, { method: 'DELETE' }),
     onSuccess: async (_data, itemId) => {
       queryClient.removeQueries({ queryKey: ['item', itemId] });
-      await queryClient.invalidateQueries({ queryKey: ['items'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['items'] }),
+        queryClient.invalidateQueries({ queryKey: ['item-groups'] }),
+      ]);
     },
   });
 }

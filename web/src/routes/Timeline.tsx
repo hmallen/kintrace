@@ -1,6 +1,12 @@
 import { useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useEvents, useItems, usePeople } from '../api/hooks';
+import {
+  useEvents,
+  useGenerateTimelineStory,
+  useItems,
+  usePeople,
+  useTimelineStory,
+} from '../api/hooks';
 import { ExploreTimeline } from '../components/ExploreTimeline';
 import { StoryView } from '../components/StoryView';
 import { TimelineControls, type TimelineViewMode } from '../components/TimelineControls';
@@ -41,6 +47,8 @@ export function Timeline() {
   const { data: items, isPending } = useItems(personId === undefined ? {} : { personId });
   const { data: events, isPending: eventsPending } = useEvents();
   const { data: people } = usePeople();
+  const { data: storyState, isPending: storyPending } = useTimelineStory();
+  const generateStory = useGenerateTimelineStory();
 
   // The person filter scopes events too — the API only filters items.
   const visibleEvents = useMemo(() => {
@@ -107,6 +115,11 @@ export function Timeline() {
       {!loading && !empty && view === 'story' && (
         <StoryView
           entries={entries}
+          storyState={storyState}
+          storyLoading={storyPending}
+          generating={generateStory.isPending}
+          generationError={generateStory.error?.serverMessage ?? generateStory.error?.message}
+          onGenerate={() => generateStory.mutate()}
           heading={
             personId === undefined
               ? 'The whole archive'

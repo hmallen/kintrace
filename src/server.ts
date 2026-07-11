@@ -10,6 +10,13 @@ import { importFile, type MediaType } from './importer.js';
 import { processPendingItems } from './ai/queue.js';
 import { normalizeFuzzyDate } from './dates.js';
 import type { TranscriptionEngine } from './ai/engine.js';
+import {
+  StoryGenerationError,
+  generateAndSaveTimelineStory,
+  getTimelineStoryState,
+  listStorySources,
+  type StoryGenerator,
+} from './ai/story.js';
 import { GedcomImportError, importGedcomFile } from './gedcom/importer.js';
 import {
   GedcomReviewError,
@@ -22,6 +29,22 @@ import {
   type ReviewGroup,
 } from './gedcom/review.js';
 import { MergePeopleError, mergePeople } from './people.js';
+import {
+  ItemGroupError,
+  addItemToGroup,
+  createOrMergeItemGroup,
+  getItemGroup,
+  getItemGroupForItem,
+  listItemGroups,
+  removeItemFromGroup,
+  suggestItemGroupCandidates,
+  updateItemGroupLabel,
+} from './item-groups.js';
+import {
+  AddItemGroupMemberBodySchema,
+  CreateItemGroupBodySchema,
+  UpdateItemGroupBodySchema,
+} from '../shared/api.js';
 
 export interface ServerDeps {
   db: Database.Database;
@@ -32,6 +55,7 @@ export interface ServerDeps {
   gedcomMaxBytes?: number;
   engine: TranscriptionEngine | null;
   aiDisabledMessage?: string;
+  storyGenerator?: StoryGenerator | null;
 }
 
 /**
@@ -79,6 +103,8 @@ function inferUploadMediaType(filename: string, fallback: MediaType): MediaType 
 
 export function buildServer(deps: ServerDeps): FastifyInstance {
   const { db } = deps;
+  const storyGenerator = deps.storyGenerator ?? null;
+  let storyGenerationRunning = false;
   const app = Fastify();
   // Without an explicit fileSize the plugin caps files at Fastify's bodyLimit
   // (1 MiB) — far below a typical archival scan. Uploads stream to disk, so no
@@ -92,6 +118,32 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       )
       .all(itemId);
   }
+
+  app.get('/api/timeline/story', () => getTimelineStoryState(db, storyGenerator));
+
+  app.post('/api/timeline/story', async (_req, reply) => {
+    if (!storyGenerator) {
+      return reply.code(503).send({ error: 'OpenAI story generation is not configured' });
+    }
+    if (storyGenerationRunning) {
+      return reply.code(409).send({ error: 'Story generation is already running' });
+    }
+    if (listStorySources(db).length === 0) {
+      return reply.code(409).send({ error: 'No reviewed media is available' });
+    }
+    storyGenerationRunning = true;
+    try {
+      return await generateAndSaveTimelineStory(db, storyGenerator);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Story generation failed';
+      if (error instanceof StoryGenerationError && message === 'No reviewed media is available') {
+        return reply.code(409).send({ error: message });
+      }
+      return reply.code(502).send({ error: message });
+    } finally {
+      storyGenerationRunning = false;
+    }
+  });
 
   app.get('/api/items', (req) => {
     const { status, personId } = req.query as { status?: string; personId?: string };
@@ -117,7 +169,88 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     const id = Number((req.params as { id: string }).id);
     const item = db.prepare('SELECT * FROM items WHERE id = ?').get(id);
     if (!item) return reply.code(404).send({ error: 'not found' });
-    return { ...toItemResponse(item as Record<string, unknown>), people: itemPeople(id) };
+    return {
+      ...toItemResponse(item as Record<string, unknown>),
+      people: itemPeople(id),
+      group: getItemGroupForItem(db, id),
+    };
+  });
+
+  app.get('/api/items/:id/group-suggestions', (req, reply) => {
+    const id = Number((req.params as { id: string }).id);
+    if (!Number.isSafeInteger(id) || id < 1) {
+      return reply.code(400).send({ error: 'invalid item id' });
+    }
+    try {
+      return suggestItemGroupCandidates(db, id);
+    } catch (err) {
+      if (err instanceof ItemGroupError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  app.post('/api/item-groups', (req, reply) => {
+    const parsed = CreateItemGroupBodySchema.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.code(400).send({ error: 'itemIds must contain at least two item ids' });
+    try {
+      return reply.code(201).send(createOrMergeItemGroup(db, parsed.data.itemIds, parsed.data.label));
+    } catch (err) {
+      if (err instanceof ItemGroupError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  app.get('/api/item-groups', () => listItemGroups(db));
+
+  app.get('/api/item-groups/:id', (req, reply) => {
+    const id = Number((req.params as { id: string }).id);
+    if (!Number.isSafeInteger(id) || id < 1) return reply.code(400).send({ error: 'invalid group id' });
+    const group = getItemGroup(db, id);
+    return group ?? reply.code(404).send({ error: 'item group not found' });
+  });
+
+  app.patch('/api/item-groups/:id', (req, reply) => {
+    const id = Number((req.params as { id: string }).id);
+    if (!Number.isSafeInteger(id) || id < 1) return reply.code(400).send({ error: 'invalid group id' });
+    const parsed = UpdateItemGroupBodySchema.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.code(400).send({ error: 'label must be 1 to 200 characters or null' });
+    try {
+      return updateItemGroupLabel(db, id, parsed.data.label);
+    } catch (err) {
+      if (err instanceof ItemGroupError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  app.post('/api/item-groups/:id/items', (req, reply) => {
+    const groupId = Number((req.params as { id: string }).id);
+    if (!Number.isSafeInteger(groupId) || groupId < 1) {
+      return reply.code(400).send({ error: 'invalid group id' });
+    }
+    const parsed = AddItemGroupMemberBodySchema.safeParse(req.body ?? {});
+    if (!parsed.success) return reply.code(400).send({ error: 'itemId must be a positive integer' });
+    try {
+      return addItemToGroup(db, groupId, parsed.data.itemId);
+    } catch (err) {
+      if (err instanceof ItemGroupError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
+  });
+
+  app.delete('/api/item-groups/:id/items/:itemId', (req, reply) => {
+    const { id: rawGroupId, itemId: rawItemId } = req.params as { id: string; itemId: string };
+    const groupId = Number(rawGroupId);
+    const itemId = Number(rawItemId);
+    if (!Number.isSafeInteger(groupId) || groupId < 1 || !Number.isSafeInteger(itemId) || itemId < 1) {
+      return reply.code(400).send({ error: 'invalid group or item id' });
+    }
+    try {
+      removeItemFromGroup(db, groupId, itemId);
+      return reply.code(204).send();
+    } catch (err) {
+      if (err instanceof ItemGroupError) return reply.code(err.statusCode).send({ error: err.message });
+      throw err;
+    }
   });
 
   app.patch('/api/items/:id', (req, reply) => {
@@ -176,7 +309,11 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       db.prepare(`UPDATE items SET ${sets.join(', ')} WHERE id = ?`).run(...params, id);
     }
     const updated = db.prepare('SELECT * FROM items WHERE id = ?').get(id);
-    return { ...toItemResponse(updated as Record<string, unknown>), people: itemPeople(id) };
+    return {
+      ...toItemResponse(updated as Record<string, unknown>),
+      people: itemPeople(id),
+      group: getItemGroupForItem(db, id),
+    };
   });
 
   app.get('/api/items/:id/thumbnail', (req, reply) => {
@@ -195,8 +332,17 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     if (!Number.isSafeInteger(id) || id < 1) {
       return reply.code(400).send({ error: 'invalid item id' });
     }
+    const membership = db.prepare('SELECT group_id FROM item_group_members WHERE item_id = ?').get(id) as
+      | { group_id: number }
+      | undefined;
     const result = db.prepare('DELETE FROM items WHERE id = ?').run(id);
     if (result.changes === 0) return reply.code(404).send({ error: 'item not found' });
+    if (membership) {
+      const remaining = (db.prepare(
+        'SELECT COUNT(*) AS count FROM item_group_members WHERE group_id = ?'
+      ).get(membership.group_id) as { count: number }).count;
+      if (remaining < 2) db.prepare('DELETE FROM item_groups WHERE id = ?').run(membership.group_id);
+    }
     return reply.code(204).send();
   });
 
@@ -317,6 +463,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
           archiveDir: deps.archiveDir,
           cacheDir: deps.cacheDir,
           mediaType: validMediaType,
+          originalFilename: path.basename(p),
         });
         results.push({ path: p, ...r });
       } catch (e) {
@@ -367,6 +514,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
             archiveDir: deps.archiveDir,
             cacheDir: deps.cacheDir,
             mediaType: validMediaType,
+            originalFilename: filename,
           });
           const item = db.prepare('SELECT media_type, status FROM items WHERE id = ?').get(r.itemId) as {
             media_type: MediaType; status: 'pending' | 'transcribed' | 'reviewed';

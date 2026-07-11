@@ -28,6 +28,19 @@ CREATE TABLE IF NOT EXISTS pages (
   file_path TEXT NOT NULL,
   UNIQUE (item_id, page_index)
 );
+CREATE TABLE IF NOT EXISTS item_groups (
+  id INTEGER PRIMARY KEY,
+  label TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS item_group_members (
+  group_id INTEGER NOT NULL REFERENCES item_groups(id) ON DELETE CASCADE,
+  item_id INTEGER NOT NULL UNIQUE REFERENCES items(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (group_id, item_id)
+);
+CREATE INDEX IF NOT EXISTS item_group_members_group_position
+  ON item_group_members (group_id, position, item_id);
 CREATE TABLE IF NOT EXISTS people (
   id INTEGER PRIMARY KEY,
   name TEXT NOT NULL,
@@ -89,6 +102,15 @@ CREATE TABLE IF NOT EXISTS person_relationships (
   gedcom_import_id INTEGER REFERENCES gedcom_imports(id) ON DELETE SET NULL,
   UNIQUE (person_id, related_person_id, relationship, gedcom_import_id)
 );
+CREATE TABLE IF NOT EXISTS timeline_story (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  story_json TEXT NOT NULL,
+  source_references_json TEXT NOT NULL,
+  source_digest TEXT NOT NULL,
+  source_count INTEGER NOT NULL,
+  model TEXT NOT NULL,
+  generated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `;
 
 export function openDb(path: string): Database.Database {
@@ -101,6 +123,7 @@ export function openDb(path: string): Database.Database {
   ensureColumn(db, 'events', 'gedcom_tag', 'TEXT');
   ensureColumn(db, 'events', 'gedcom_date_raw', 'TEXT');
   ensureColumn(db, 'events', 'source_text', 'TEXT');
+  ensureColumn(db, 'items', 'original_filename', 'TEXT');
   return db;
 }
 

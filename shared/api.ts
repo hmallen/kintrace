@@ -36,6 +36,21 @@ export const ItemSummarySchema = z.object({
 });
 export type ItemSummary = z.infer<typeof ItemSummarySchema>;
 
+export const ItemGroupSchema = z.object({
+  id: z.number(),
+  label: z.string().nullable(),
+  createdAt: z.string(),
+  items: z.array(ItemSummarySchema),
+});
+export type ItemGroup = z.infer<typeof ItemGroupSchema>;
+
+export const ItemGroupSuggestionSchema = z.object({
+  item: ItemSummarySchema,
+  confidence: z.enum(['possible', 'likely']),
+  reasons: z.array(z.enum(['filename', 'title', 'transcription'])),
+});
+export type ItemGroupSuggestion = z.infer<typeof ItemGroupSuggestionSchema>;
+
 export const ItemDetailSchema = ItemSummarySchema.extend({
   file_path: z.string(),
   created_at: z.string(),
@@ -46,6 +61,7 @@ export const ItemDetailSchema = ItemSummarySchema.extend({
   ai_names: z.string().nullable(),          // JSON string, NOT parsed
   ai_confidence: ConfidenceSchema.nullable(), // parsed object | null
   people: z.array(PersonRefSchema),
+  group: ItemGroupSchema.nullable().optional(),
 });
 export type ItemDetail = z.infer<typeof ItemDetailSchema>;
 
@@ -68,6 +84,47 @@ export const EventSummarySchema = z.object({
   source_text: z.string().nullable(),
 });
 export type EventSummary = z.infer<typeof EventSummarySchema>;
+
+export const TimelineStoryParagraphSchema = z.object({
+  text: z.string().min(1),
+  sourceItemIds: z.array(z.number().int().positive()).min(1),
+});
+export type TimelineStoryParagraph = z.infer<typeof TimelineStoryParagraphSchema>;
+
+export const TimelineStorySectionSchema = z.object({
+  heading: z.string().min(1),
+  paragraphs: z.array(TimelineStoryParagraphSchema).min(1),
+});
+export type TimelineStorySection = z.infer<typeof TimelineStorySectionSchema>;
+
+export const TimelineStorySchema = z.object({
+  title: z.string().min(1),
+  sections: z.array(TimelineStorySectionSchema).min(1),
+});
+export type TimelineStory = z.infer<typeof TimelineStorySchema>;
+
+export const TimelineStorySourceSchema = z.object({
+  itemId: z.number().int().positive(),
+  title: z.string(),
+  dateStart: z.string().nullable(),
+  dateEnd: z.string().nullable(),
+  datePrecision: PrecisionSchema,
+  available: z.boolean(),
+});
+export type TimelineStorySource = z.infer<typeof TimelineStorySourceSchema>;
+
+export const TimelineStoryStateSchema = z.object({
+  story: TimelineStorySchema.nullable(),
+  sources: z.array(TimelineStorySourceSchema),
+  generatedAt: z.string().nullable(),
+  model: z.string().nullable(),
+  storySourceCount: z.number().int().nonnegative(),
+  eligibleSourceCount: z.number().int().nonnegative(),
+  stale: z.boolean(),
+  canGenerate: z.boolean(),
+  unavailableReason: z.enum(['openai_not_configured', 'no_reviewed_media']).nullable(),
+});
+export type TimelineStoryState = z.infer<typeof TimelineStoryStateSchema>;
 
 export const GedcomWarningSchema = z.object({
   line: z.number().optional(),
@@ -168,3 +225,19 @@ export type PatchItemBody = z.infer<typeof PatchItemBodySchema>;
 
 export const LinkPersonBodySchema = z.object({ personId: z.number(), role: PersonRoleSchema });
 export type LinkPersonBody = z.infer<typeof LinkPersonBodySchema>;
+
+export const CreateItemGroupBodySchema = z.object({
+  itemIds: z.array(z.number().int().positive()).min(2),
+  label: z.string().trim().min(1).max(200).optional(),
+});
+export type CreateItemGroupBody = z.infer<typeof CreateItemGroupBodySchema>;
+
+export const AddItemGroupMemberBodySchema = z.object({
+  itemId: z.number().int().positive(),
+});
+export type AddItemGroupMemberBody = z.infer<typeof AddItemGroupMemberBodySchema>;
+
+export const UpdateItemGroupBodySchema = z.object({
+  label: z.string().trim().min(1).max(200).nullable(),
+});
+export type UpdateItemGroupBody = z.infer<typeof UpdateItemGroupBodySchema>;

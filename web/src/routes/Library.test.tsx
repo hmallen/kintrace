@@ -4,7 +4,7 @@ import { vi } from 'vitest';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
-import type { ItemSummary } from '@shared/api.js';
+import type { ItemGroup, ItemSummary } from '@shared/api.js';
 import { makeQueryClient } from '../queryClient';
 import { routes } from '../router';
 import { server } from '../test/msw';
@@ -56,6 +56,16 @@ function renderAt(path: string) {
   return router;
 }
 
+function dragDataTransfer() {
+  const values = new Map<string, string>();
+  return {
+    effectAllowed: 'none',
+    dropEffect: 'none',
+    setData: (type: string, value: string) => values.set(type, value),
+    getData: (type: string) => values.get(type) ?? '',
+  };
+}
+
 describe('Library', () => {
   it('renders a card per item', async () => {
     server.use(itemsHandler(items));
@@ -75,6 +85,80 @@ describe('Library', () => {
     expect(within(third!).getByText('Untitled')).toBeInTheDocument();
     expect(within(third!).getByText('reviewed')).toBeInTheDocument();
     expect(within(third!).getByText('Undated')).toBeInTheDocument();
+  });
+
+  it('shows grouped items together and leaves other items ungrouped', async () => {
+    const group: ItemGroup = {
+      id: 12,
+      label: 'Grandpa letter views',
+      createdAt: '2026-07-11 00:00:00',
+      items: items.slice(0, 2),
+    };
+    server.use(
+      itemsHandler(items),
+      http.get('/api/item-groups', () => HttpResponse.json([group])),
+    );
+    renderAt('/');
+
+    const grouped = await screen.findByRole('region', { name: 'Grandpa letter views' });
+    expect(within(grouped).getByText('Letter from Grandpa')).toBeInTheDocument();
+    expect(within(grouped).getByText('Wedding photo')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Ungrouped items' })).toBeInTheDocument();
+    expect(screen.getByText('Untitled')).toBeInTheDocument();
+  });
+
+  it('creates a group by dragging an item onto another item', async () => {
+    let groupedIds: number[] | undefined;
+    server.use(
+      itemsHandler(items),
+      http.post('/api/item-groups', async ({ request }) => {
+        groupedIds = ((await request.json()) as { itemIds: number[] }).itemIds;
+        return HttpResponse.json({
+          id: 20,
+          label: null,
+          createdAt: '2026-07-11 00:00:00',
+          items: [items[1], items[0]],
+        }, { status: 201 });
+      }),
+    );
+    renderAt('/');
+
+    const source = (await screen.findByText('Letter from Grandpa')).closest('li')!;
+    const target = screen.getByText('Wedding photo').closest('li')!;
+    const dataTransfer = dragDataTransfer();
+    fireEvent.dragStart(source, { dataTransfer });
+    fireEvent.dragOver(target, { dataTransfer });
+    fireEvent.drop(target, { dataTransfer });
+
+    await waitFor(() => expect(groupedIds).toEqual([2, 1]));
+  });
+
+  it('adds an item by dropping it on a group container', async () => {
+    const group: ItemGroup = {
+      id: 12,
+      label: 'Grandpa letter views',
+      createdAt: '2026-07-11 00:00:00',
+      items: items.slice(0, 2),
+    };
+    let addedItemId: number | undefined;
+    server.use(
+      itemsHandler(items),
+      http.get('/api/item-groups', () => HttpResponse.json([group])),
+      http.post('/api/item-groups/12/items', async ({ request }) => {
+        addedItemId = ((await request.json()) as { itemId: number }).itemId;
+        return HttpResponse.json({ ...group, items });
+      }),
+    );
+    renderAt('/');
+
+    const source = (await screen.findByText('Untitled')).closest('li')!;
+    const target = screen.getByRole('region', { name: 'Grandpa letter views' });
+    const dataTransfer = dragDataTransfer();
+    fireEvent.dragStart(source, { dataTransfer });
+    fireEvent.dragOver(target, { dataTransfer });
+    fireEvent.drop(target, { dataTransfer });
+
+    await waitFor(() => expect(addedItemId).toBe(3));
   });
 
   it('status filter drives the query', async () => {

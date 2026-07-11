@@ -47,8 +47,9 @@ The backend reads these environment variables:
 - `PORT` - API port. Defaults to `3271`.
 - `KINTRACE_DATA` - runtime data directory. Defaults to `./data`.
 - `TRANSCRIBE_PROVIDER` - AI provider, either `openai` or `anthropic`. Defaults to `openai`.
-- `OPENAI_API_KEY` - required when `TRANSCRIBE_PROVIDER=openai`.
+- `OPENAI_API_KEY` - required when `TRANSCRIBE_PROVIDER=openai` and independently required for timeline story generation.
 - `OPENAI_VISION_MODEL` - optional OpenAI vision model override. Defaults to the provider implementation default.
+- `OPENAI_STORY_MODEL` - optional timeline story model override. Defaults to `gpt-5.6`.
 - `ANTHROPIC_API_KEY` - required when `TRANSCRIBE_PROVIDER=anthropic`.
 
 API keys are optional for local browsing and import work. If the selected provider key is missing, the backend still starts, but `POST /api/queue/process` returns `503` and logs which variable is missing.
@@ -136,7 +137,7 @@ npm run build
 The Timeline route (`/timeline`) offers three views over the same `/api/items` + `/api/events` feed, switched from the controls bar. View, scale, orientation, and person filter are kept in the URL, so any configuration is shareable and back-button friendly.
 
 - **Explore** (default) - a custom virtualized axis that only renders viewport-visible entries. The **scale** toggle switches between *chronological* (positions map to real time, empty decades stay visibly empty) and *sequential* (entries evenly spaced by order, compressing gaps). The **orientation** toggle flips horizontal/vertical. Crowded stretches collapse into a cluster chip (for example `1923 · 5 items`) that expands in place. Items with `month`/`year`/`decade` precision draw their full date span with a faded or hatched bar plus a `c.`-style label; items without dates stay visible in the undated tray below the axis.
-- **Story** - a scroll-driven react-chrono narrative of the current subset with a chapter card per decade. Filter by a person first to read one life as a story.
+- **Story** - a saved, manually generated whole-library narrative above the scroll-driven react-chrono cards. **Generate story** sends only reviewed media descriptions, both transcriptions, dates, titles, and linked people to OpenAI; every paragraph links back to its supporting library items. The person filter still scopes the chronological cards, but never the generated archive narrative. The story is not regenerated automatically: library changes mark it out of date until **Regenerate story** is pressed.
 - **Table** - the same entries as a captioned data table (also the screen-reader fallback), including undated items.
 
 Keyboard: `Tab` reaches the controls and one timeline card; arrow keys move card-to-card along the axis, `Home`/`End` jump to the ends, and `Enter` opens the item workspace. On viewports narrower than 640px the Explore view always stacks vertically and the orientation toggle is hidden.

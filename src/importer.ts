@@ -14,6 +14,7 @@ export interface ImportOptions {
   archiveDir: string;
   cacheDir: string;
   mediaType: MediaType;
+  originalFilename?: string;
 }
 
 async function hashFile(sourcePath: string): Promise<string> {
@@ -56,8 +57,10 @@ export async function importFile(
     }
 
     const info = db
-      .prepare('INSERT INTO items (file_path, content_hash, media_type, thumb_path) VALUES (?, ?, ?, ?)')
-      .run(destPath, hash, opts.mediaType, isImage ? thumbPath : null);
+      .prepare(
+        'INSERT INTO items (file_path, content_hash, media_type, thumb_path, original_filename) VALUES (?, ?, ?, ?, ?)'
+      )
+      .run(destPath, hash, opts.mediaType, isImage ? thumbPath : null, opts.originalFilename ?? basename(sourcePath));
     return { itemId: Number(info.lastInsertRowid), duplicate: false };
   } catch (err) {
     // Clean up anything this call created that ended up untracked, whether

@@ -6,6 +6,7 @@ import {
   ItemDetailSchema,
   PersonSchema,
   CreatePersonResultSchema,
+  TimelineStoryStateSchema,
 } from '../shared/api.js';
 
 let db: ReturnType<typeof openDb>;
@@ -31,6 +32,14 @@ describe('shared wire contract', () => {
     expect(res.statusCode).toBe(200);
     const parsed = ItemSummarySchema.array().parse(res.json());
     expect(parsed).toHaveLength(1);
+  });
+
+  it('GET /api/timeline/story parses as TimelineStoryState', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/timeline/story' });
+    expect(res.statusCode).toBe(200);
+    const parsed = TimelineStoryStateSchema.parse(res.json());
+    expect(parsed.story).toBeNull();
+    expect(parsed.unavailableReason).toBe('openai_not_configured');
   });
 
   it('GET /api/items/:id parses as ItemDetail', async () => {

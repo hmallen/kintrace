@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
-import type { EventSummary, ItemSummary, Person } from '@shared/api.js';
+import type { EventSummary, ItemSummary, Person, TimelineStoryState } from '@shared/api.js';
 import { makeQueryClient } from '../queryClient';
 import { routes } from '../router';
 import { server } from '../test/msw';
@@ -176,6 +176,107 @@ describe('Timeline route', () => {
     expect(await screen.findByText('The 1940s')).toBeInTheDocument();
     expect(screen.getByText('Letter from Grandpa')).toBeInTheDocument();
     expect(screen.queryByTestId('explore-scroller')).not.toBeInTheDocument();
+  });
+
+  it('generates only on a manual press and shows source-linked whole-library prose', async () => {
+    const user = userEvent.setup();
+    let postCalls = 0;
+    const emptyState: TimelineStoryState = {
+      story: null,
+      sources: [],
+      generatedAt: null,
+      model: null,
+      storySourceCount: 0,
+      eligibleSourceCount: 1,
+      stale: false,
+      canGenerate: true,
+      unavailableReason: null,
+    };
+    const savedState: TimelineStoryState = {
+      ...emptyState,
+      story: {
+        title: 'The Voss archive',
+        sections: [{
+          heading: 'A documented beginning',
+          paragraphs: [{ text: 'Ada appears in a reviewed portrait.', sourceItemIds: [2] }],
+        }],
+      },
+      sources: [{
+        itemId: 2,
+        title: 'Mystery photo',
+        dateStart: null,
+        dateEnd: null,
+        datePrecision: 'unknown',
+        available: true,
+      }],
+      generatedAt: '2026-07-11 12:00:00',
+      model: 'test-model',
+      storySourceCount: 1,
+    };
+    server.use(
+      http.get('/api/items', ({ request }) => {
+        const personId = new URL(request.url).searchParams.get('personId');
+        return HttpResponse.json(personId === '3' ? [adaItem] : items);
+      }),
+      eventsHandler([]),
+      peopleHandler(people),
+      http.get('/api/timeline/story', () => HttpResponse.json(emptyState)),
+      http.post('/api/timeline/story', () => {
+        postCalls += 1;
+        return HttpResponse.json(savedState);
+      }),
+    );
+    renderAt('/timeline?view=story&personId=3');
+
+    const generate = await screen.findByRole('button', { name: 'Generate story' });
+    expect(postCalls).toBe(0);
+    await user.click(generate);
+
+    expect(await screen.findByRole('heading', { name: 'The Voss archive' })).toBeInTheDocument();
+    expect(postCalls).toBe(1);
+    expect(screen.getByText('Ada appears in a reviewed portrait.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Mystery photo · Undated/ })).toHaveAttribute(
+      'href',
+      '/items/2',
+    );
+    expect(screen.getByText(/regardless of the person filter/i)).toBeInTheDocument();
+  });
+
+  it('keeps a stale saved story visible with an out-of-date warning', async () => {
+    const staleState: TimelineStoryState = {
+      story: {
+        title: 'Saved archive story',
+        sections: [{
+          heading: 'Saved section',
+          paragraphs: [{ text: 'Previously generated text.', sourceItemIds: [2] }],
+        }],
+      },
+      sources: [{
+        itemId: 2,
+        title: 'Mystery photo',
+        dateStart: null,
+        dateEnd: null,
+        datePrecision: 'unknown',
+        available: true,
+      }],
+      generatedAt: '2026-07-11 12:00:00',
+      model: 'test-model',
+      storySourceCount: 1,
+      eligibleSourceCount: 2,
+      stale: true,
+      canGenerate: true,
+      unavailableReason: null,
+    };
+    server.use(
+      itemsHandler([items[0]!]),
+      eventsHandler([]),
+      http.get('/api/timeline/story', () => HttpResponse.json(staleState)),
+    );
+    renderAt('/timeline?view=story');
+
+    expect(await screen.findByText('Previously generated text.')).toBeInTheDocument();
+    expect(screen.getByText('Out of date.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Regenerate story' })).toBeEnabled();
   });
 
   it('scopes Story mode to the selected person, events included', async () => {

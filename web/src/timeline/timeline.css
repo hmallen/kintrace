@@ -456,6 +456,89 @@
 /* The Theme prop doesn't cover chrono's card borders/subtitle blues; bring
    those onto the desk palette, scoped so nothing leaks past Story mode. */
 
+.generated-story {
+  margin: 0 0 1.5rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--kt-rule);
+  border-radius: var(--kt-radius);
+  background: var(--kt-mat);
+  box-shadow: var(--kt-shadow-card);
+}
+
+.generated-story-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.generated-story-heading h3,
+.generated-story-heading p {
+  margin-top: 0;
+}
+
+.generated-story-heading p,
+.generated-story-note,
+.generated-story-article footer {
+  color: var(--kt-ink-soft);
+}
+
+.generated-story-stale {
+  margin: 0.9rem 0;
+  padding: 0.55rem 0.7rem;
+  border-left: 3px solid var(--kt-accent);
+  background: var(--kt-accent-wash);
+}
+
+.generated-story-article {
+  max-width: 52rem;
+  margin: 1.25rem auto 0;
+}
+
+.generated-story-article h4 {
+  margin: 0 0 1rem;
+  font-family: var(--kt-font-display);
+  font-size: 1.55rem;
+}
+
+.generated-story-article h5 {
+  margin: 1.4rem 0 0.45rem;
+  font-family: var(--kt-font-display);
+  font-size: 1.15rem;
+}
+
+.generated-story-paragraph {
+  margin-bottom: 1rem;
+}
+
+.generated-story-paragraph > p {
+  font-family: var(--kt-font-display);
+  font-size: 1.05rem;
+  line-height: 1.75;
+}
+
+.story-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.78rem;
+}
+
+.story-sources li {
+  padding: 0.12rem 0.45rem;
+  border: 1px solid var(--kt-rule);
+  border-radius: 999px;
+  background: var(--kt-paper);
+}
+
+.generated-story-article footer {
+  margin-top: 1.25rem;
+  font-size: 0.78rem;
+}
+
 .story-view .timeline-card-content.rc-card,
 .story-view .card-media-wrapper {
   border-color: var(--kt-rule);
@@ -485,6 +568,11 @@
    (stacked cards down the page); here the chrome adapts around that. */
 
 @media (max-width: 640px) {
+  .generated-story-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .timeline-controls {
     gap: 0.6rem;
   }

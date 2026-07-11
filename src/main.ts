@@ -8,6 +8,7 @@ import {
   resolveProvider,
 } from './ai/providers.js';
 import { createLlmVisionEngine, type TranscriptionEngine } from './ai/engine.js';
+import { createOpenAIStoryModelClient, createStoryGenerator } from './ai/story.js';
 
 const dataDir = process.env.KINTRACE_DATA ?? join(process.cwd(), 'data');
 const archiveDir = join(dataDir, 'archive');
@@ -34,7 +35,24 @@ if (choice.ok) {
   console.warn(choice.message);
 }
 
-const app = buildServer({ db, archiveDir, cacheDir, stagingDir, gedcomArchiveDir, engine, aiDisabledMessage });
+const storyModel = process.env.OPENAI_STORY_MODEL ?? 'gpt-5.6';
+const storyGenerator = process.env.OPENAI_API_KEY
+  ? createStoryGenerator(
+      createOpenAIStoryModelClient(process.env.OPENAI_API_KEY, storyModel),
+      storyModel,
+    )
+  : null;
+
+const app = buildServer({
+  db,
+  archiveDir,
+  cacheDir,
+  stagingDir,
+  gedcomArchiveDir,
+  engine,
+  aiDisabledMessage,
+  storyGenerator,
+});
 const port = Number(process.env.PORT ?? 3271);
 app.listen({ port, host: '127.0.0.1' }).then(() => {
   console.log(`KinTrace API on http://127.0.0.1:${port}`);

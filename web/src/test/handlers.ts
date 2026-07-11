@@ -6,6 +6,7 @@ import type {
   ItemSummary,
   Person,
   QueueResult,
+  TimelineStoryState,
 } from '@shared/api.js';
 
 // GET /api/items handler that filters by the `status` query param, like the
@@ -44,8 +45,23 @@ export function peopleHandler(people: Person[]) {
   return http.get('/api/people', () => HttpResponse.json(people));
 }
 
+export const emptyStoryState: TimelineStoryState = {
+  story: null,
+  sources: [],
+  generatedAt: null,
+  model: null,
+  storySourceCount: 0,
+  eligibleSourceCount: 0,
+  stale: false,
+  canGenerate: false,
+  unavailableReason: 'no_reviewed_media',
+};
+
 // Relative base paths — MSW intercepts the same relative URLs apiFetch builds.
 export const handlers = [
+  http.get('/api/timeline/story', () => HttpResponse.json(emptyStoryState)),
+  http.get('/api/items/:id/group-suggestions', () => HttpResponse.json([])),
+  http.get('/api/item-groups', () => HttpResponse.json([])),
   itemsHandler([]),
   uploadHandler([]),
   queueProcessHandler({ processed: 0, failed: 0 }),

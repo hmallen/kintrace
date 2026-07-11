@@ -147,6 +147,70 @@ label {
   color: var(--kt-danger);
 }
 
+.item-navigation {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  color: var(--kt-ink-soft);
+}
+
+.item-group-panel {
+  padding: 0.9rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--kt-rule);
+  border-radius: 0.5rem;
+}
+
+.item-group-panel h3,
+.item-group-panel h4 {
+  margin-top: 0;
+}
+
+.item-group-views,
+.item-group-suggestions {
+  padding: 0;
+  list-style: none;
+}
+
+.item-group-views {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+}
+
+.item-group-views li {
+  width: 7rem;
+  flex: 0 0 auto;
+}
+
+.item-group-views li.is-current {
+  font-weight: 700;
+}
+
+.item-group-views a,
+.item-group-views .thumb {
+  display: block;
+  width: 100%;
+}
+
+.item-group-views .thumb {
+  height: 5rem;
+  object-fit: cover;
+}
+
+.item-group-add {
+  margin-top: 0.75rem;
+}
+
+.item-group-name {
+  margin-bottom: 0.75rem;
+}
+
+.item-group-suggestions li {
+  margin-bottom: 0.5rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -310,6 +374,60 @@ label {
 
 .card-grid > li {
   position: relative;
+  border-radius: var(--kt-radius);
+}
+
+.card-grid > li[draggable='true'] {
+  cursor: grab;
+}
+
+.card-grid > li[draggable='true']:active {
+  cursor: grabbing;
+}
+
+.library-groups {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.library-group {
+  padding: 1rem;
+  border: 1px solid var(--kt-rule);
+  border-radius: calc(var(--kt-radius) + 2px);
+  background: color-mix(in srgb, var(--kt-paper) 72%, var(--kt-desk));
+  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.library-group-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.library-group-heading h3,
+.library-ungrouped h3 {
+  margin: 0;
+}
+
+.library-group-heading span {
+  color: var(--kt-ink-soft);
+  font-size: 0.85rem;
+}
+
+.library-group.is-drop-target,
+.card-grid > li.is-drop-target {
+  outline: 3px solid color-mix(in srgb, var(--kt-accent) 70%, transparent);
+  outline-offset: 3px;
+}
+
+.library-group.is-drop-target {
+  background: color-mix(in srgb, var(--kt-accent) 9%, var(--kt-paper));
+}
+
+.library-ungrouped h3 {
+  margin-bottom: 0.9rem;
 }
 
 .item-delete {
@@ -420,13 +538,36 @@ label {
 
 .viewer-controls {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.viewer-controls .zoom-level {
+  min-width: 3.25rem;
+  color: var(--kt-ink-soft);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .print-scroll {
   overflow: auto;
   max-height: 80vh;
+}
+
+.print-scroll.is-fitted {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: min(70vh, 52rem);
+}
+
+.print-scroll.is-fitted img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 .hint {

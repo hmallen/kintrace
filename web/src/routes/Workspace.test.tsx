@@ -6,6 +6,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import type {
   ItemDetail,
+  ItemSummary,
   LinkPersonBody,
   PatchItemBody,
   Person,
@@ -152,6 +153,118 @@ async function loadWorkspace(item: ItemDetail, people: Person[] = []) {
 }
 
 describe('Workspace', () => {
+  it('shows grouped views and can navigate between them', async () => {
+    const second: ItemSummary = {
+      id: 2,
+      title: 'Letter detail',
+      media_type: 'letter',
+      date_start: null,
+      date_end: null,
+      date_precision: 'unknown',
+      status: 'pending',
+      content_hash: 'hash2',
+      thumb_path: 'thumbs/hash2.jpg',
+    };
+    const groupLabels: unknown[] = [];
+    const groupedItem: ItemDetail = {
+      ...baseItem,
+      group: {
+        id: 10,
+        label: 'Grandpa letter',
+        createdAt: '2026-07-11 00:00:00',
+        items: [baseItem, second],
+      },
+    };
+    server.use(http.patch('/api/item-groups/10', async ({ request }) => {
+      groupLabels.push(await request.json());
+      return HttpResponse.json({ ...groupedItem.group, label: 'Marshall family letter' });
+    }));
+    const { qc } = await loadWorkspace(groupedItem);
+
+    const panel = screen.getByRole('heading', { name: 'Views of this item' }).closest('section')!;
+    expect(within(panel).getByRole('link', { name: /Letter detail/i })).toHaveAttribute('href', '/items/2');
+    expect(within(panel).getByRole('button', { name: /Remove this view/i })).toBeEnabled();
+    const nameInput = within(panel).getByRole('textbox', { name: 'Group name' });
+    expect(nameInput).toHaveValue('Grandpa letter');
+    await userEvent.clear(nameInput);
+    await userEvent.type(nameInput, 'Marshall family letter');
+    await userEvent.click(within(panel).getByRole('button', { name: 'Save group name' }));
+    await settled(qc);
+    expect(groupLabels).toEqual([{ label: 'Marshall family letter' }]);
+  });
+
+  it('requires acceptance before grouping an automated suggestion', async () => {
+    const candidate: ItemSummary = {
+      id: 2,
+      title: 'Letter close-up',
+      media_type: 'letter',
+      date_start: null,
+      date_end: null,
+      date_precision: 'unknown',
+      status: 'pending',
+      content_hash: 'hash2',
+      thumb_path: 'thumbs/hash2.jpg',
+    };
+    const bodies: unknown[] = [];
+    server.use(
+      http.get('/api/items/1/group-suggestions', () => HttpResponse.json([{
+        item: candidate,
+        confidence: 'likely',
+        reasons: ['filename', 'transcription'],
+      }])),
+      http.post('/api/item-groups', async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json({
+          id: 20,
+          label: null,
+          createdAt: '2026-07-11 00:00:00',
+          items: [baseItem, candidate],
+        }, { status: 201 });
+      }),
+    );
+    const { qc } = await loadWorkspace(baseItem);
+
+    expect(await screen.findByText(/similar filename, matching transcription/i)).toBeInTheDocument();
+    expect(bodies).toEqual([]);
+    await userEvent.click(screen.getByRole('button', { name: 'Group as another view' }));
+    await settled(qc);
+    expect(bodies).toEqual([{ itemIds: [1, 2] }]);
+  });
+
+  it('navigates through the filtered library queue one item at a time', async () => {
+    const secondItem: ItemDetail = { ...baseItem, id: 2, title: 'Second letter' };
+    const summaries: ItemSummary[] = [baseItem, secondItem].map((item) => ({
+      id: item.id,
+      title: item.title,
+      media_type: item.media_type,
+      date_start: item.date_start,
+      date_end: item.date_end,
+      date_precision: item.date_precision,
+      status: item.status,
+      content_hash: item.content_hash,
+      thumb_path: item.thumb_path,
+    }));
+    server.use(
+      http.get('/api/items', ({ request }) => {
+        const requestedStatus = new URL(request.url).searchParams.get('status');
+        if (requestedStatus !== null) expect(requestedStatus).toBe('transcribed');
+        return HttpResponse.json(summaries);
+      }),
+      http.get('/api/items/1', () => HttpResponse.json(baseItem)),
+      http.get('/api/items/2', () => HttpResponse.json(secondItem)),
+    );
+    const { router } = renderAt('/items/1?status=transcribed');
+
+    expect(await screen.findByText('1 of 2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/items/2'));
+    expect(router.state.location.search).toBe('?status=transcribed');
+    expect(await screen.findByText('2 of 2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+  });
+
   it('renders AI fields', async () => {
     await loadWorkspace(baseItem);
 
@@ -191,6 +304,7 @@ describe('Workspace', () => {
 
     await waitFor(() => expect(patches).toHaveLength(1));
     expect(patches[0]).toEqual({ title: 'V-mail from Grandpa' });
+    expect(await screen.findByRole('status')).toHaveTextContent('Changes saved.');
     await settled(qc);
   });
 

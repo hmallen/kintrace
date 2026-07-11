@@ -74,6 +74,7 @@ describe('POST /api/upload', () => {
       | undefined;
     expect(row).toBeDefined();
     expect(row!.media_type).toBe('photo');
+    expect(row!.original_filename).toBe('grandma.jpg');
 
     expect(await readdir(stagingDir)).toEqual([]);
   });

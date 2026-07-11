@@ -1,11 +1,20 @@
 import { useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { MediaTypeSchema, PrecisionSchema } from '@shared/api.js';
-import type { ItemDetail, MediaType, PatchItemBody } from '@shared/api.js';
-import { useItem, useUpdateItem } from '../api/hooks';
+import { MediaTypeSchema, PrecisionSchema, StatusSchema } from '@shared/api.js';
+import type { ItemDetail, ItemSummary, MediaType, PatchItemBody } from '@shared/api.js';
+import {
+  useCreateItemGroup,
+  useItem,
+  useItemGroupSuggestions,
+  useItems,
+  useRemoveItemFromGroup,
+  useUpdateItemGroup,
+  useUpdateItem,
+  type ItemFilters,
+} from '../api/hooks';
 import { FlagsSidebar } from '../review/FlagsSidebar';
 import {
   TranscriptionEditor,
@@ -16,6 +25,7 @@ import { MediaViewer } from '../components/MediaViewer';
 import { MetadataForm } from '../components/MetadataForm';
 import { PeoplePanel } from '../components/PeoplePanel';
 import { StatusChip } from '../components/StatusChip';
+import { Thumbnail } from '../components/Thumbnail';
 
 export const WorkspaceFormSchema = z.object({
   title: z.string(),
@@ -135,7 +145,152 @@ function TranscriptionTabs({
   );
 }
 
-function WorkspaceContent({ item }: { item: ItemDetail }) {
+const GROUP_REASON_LABELS = {
+  filename: 'similar filename',
+  title: 'matching title',
+  transcription: 'matching transcription',
+} as const;
+
+function ItemGroupPanel({ item, items }: { item: ItemDetail; items: ItemSummary[] }) {
+  const [selectedItemId, setSelectedItemId] = useState('');
+  const [newGroupName, setNewGroupName] = useState('');
+  const [groupName, setGroupName] = useState(item.group?.label ?? '');
+  const { data: allItems = items } = useItems({});
+  const { data: suggestions = [] } = useItemGroupSuggestions(item.id);
+  const createGroup = useCreateItemGroup();
+  const removeFromGroup = useRemoveItemFromGroup();
+  const updateGroup = useUpdateItemGroup();
+  const memberIds = new Set(item.group?.items.map(({ id }) => id) ?? [item.id]);
+  const availableItems = allItems.filter(({ id }) => !memberIds.has(id));
+
+  function groupWith(otherItemId: number) {
+    createGroup.mutate({
+      itemIds: [item.id, otherItemId],
+      ...(!item.group && newGroupName.trim() ? { label: newGroupName.trim() } : {}),
+    });
+  }
+
+  return (
+    <section className="item-group-panel" aria-labelledby="item-group-heading">
+      <h3 id="item-group-heading">Views of this item</h3>
+      <p className="hint">
+        Keep alternate angles and magnifications together while processing each image independently.
+      </p>
+      {item.group ? (
+        <>
+          <form
+            className="item-group-name"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const label = groupName.trim();
+              if (!label) return;
+              updateGroup.mutate({ groupId: item.group!.id, body: { label } });
+            }}
+          >
+            <label>
+              Group name{' '}
+              <input
+                value={groupName}
+                placeholder="Unnamed group"
+                onChange={(event) => setGroupName(event.target.value)}
+              />
+            </label>{' '}
+            <button type="submit" disabled={!groupName.trim() || updateGroup.isPending}>
+              Save group name
+            </button>
+          </form>
+          <ul className="item-group-views">
+            {item.group.items.map((member) => (
+              <li key={member.id} className={member.id === item.id ? 'is-current' : undefined}>
+                <Link to={`/items/${member.id}`} aria-current={member.id === item.id ? 'page' : undefined}>
+                  <Thumbnail
+                    itemId={member.id}
+                    alt={member.title ?? `View ${member.id}`}
+                    mediaType={member.media_type}
+                  />
+                  <span>{member.title ?? `Untitled view ${member.id}`}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            disabled={removeFromGroup.isPending}
+            onClick={() => removeFromGroup.mutate({ groupId: item.group!.id, itemId: item.id })}
+          >
+            Remove this view from group
+          </button>
+        </>
+      ) : (
+        <>
+          <p>This item is not grouped yet.</p>
+          <label>
+            New group name{' '}
+            <input
+              value={newGroupName}
+              placeholder="Optional"
+              onChange={(event) => setNewGroupName(event.target.value)}
+            />
+          </label>
+        </>
+      )}
+
+      {availableItems.length > 0 && (
+        <div className="item-group-add">
+          <label>
+            Add an existing item{' '}
+            <select value={selectedItemId} onChange={(event) => setSelectedItemId(event.target.value)}>
+              <option value="">Choose an item…</option>
+              {availableItems.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.title ?? `Untitled item ${candidate.id}`}
+                </option>
+              ))}
+            </select>
+          </label>{' '}
+          <button
+            type="button"
+            disabled={!selectedItemId || createGroup.isPending}
+            onClick={() => groupWith(Number(selectedItemId))}
+          >
+            Add view
+          </button>
+        </div>
+      )}
+
+      {suggestions.length > 0 && (
+        <div>
+          <h4>Possible matches</h4>
+          <ul className="item-group-suggestions">
+            {suggestions.map((suggestion) => (
+              <li key={suggestion.item.id}>
+                <span>
+                  {suggestion.item.title ?? `Untitled item ${suggestion.item.id}`} —{' '}
+                  {suggestion.reasons.map((reason) => GROUP_REASON_LABELS[reason]).join(', ')}
+                </span>{' '}
+                <button
+                  type="button"
+                  disabled={createGroup.isPending}
+                  onClick={() => groupWith(suggestion.item.id)}
+                >
+                  Group as another view
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {(createGroup.isError || removeFromGroup.isError || updateGroup.isError) && (
+        <p role="alert">
+          Could not update item views:{' '}
+          {(createGroup.error ?? removeFromGroup.error ?? updateGroup.error)?.message}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function WorkspaceContent({ item, items }: { item: ItemDetail; items: ItemSummary[] }) {
   const form = useForm<WorkspaceFormValues>({
     resolver: zodResolver(WorkspaceFormSchema),
     defaultValues: toFormValues(item),
@@ -150,13 +305,20 @@ function WorkspaceContent({ item }: { item: ItemDetail }) {
   function onSave(values: WorkspaceFormValues) {
     const patch = diffPatch(values, item);
     if (Object.keys(patch).length === 0) return;
-    saveMutation.mutate(patch);
+    saveMutation.mutate(patch, {
+      onSuccess: (savedItem) => form.reset(toFormValues(savedItem)),
+    });
   }
 
   return (
     <div className="workspace">
       <div className="workspace-media">
-        <MediaViewer itemId={item.id} alt={item.title ?? 'Item media'} mediaType={item.media_type} />
+        <MediaViewer
+          itemId={item.id}
+          alt={item.title ?? 'Item media'}
+          mediaType={item.media_type}
+          filePath={item.file_path}
+        />
       </div>
       <div className="workspace-review">
         <p>
@@ -180,6 +342,7 @@ function WorkspaceContent({ item }: { item: ItemDetail }) {
         {typeMutation.isError && (
           <p role="alert">Failed to change item type: {typeMutation.error.message}</p>
         )}
+        <ItemGroupPanel item={item} items={items} />
         <ConfidenceBanner confidence={item.ai_confidence} aiError={item.ai_error} />
         <form onSubmit={(e) => void form.handleSubmit(onSave)(e)}>
           <TranscriptionTabs
@@ -190,6 +353,11 @@ function WorkspaceContent({ item }: { item: ItemDetail }) {
           <button type="submit" className="btn-primary" disabled={saveMutation.isPending}>
             Save
           </button>
+          {saveMutation.isSuccess && !form.formState.isDirty && (
+            <span role="status" style={{ marginLeft: '0.5rem' }}>
+              Changes saved.
+            </span>
+          )}
           {saveMutation.isError && (
             <p role="alert">Save failed: {saveMutation.error.message}</p>
           )}
@@ -221,14 +389,42 @@ function WorkspaceContent({ item }: { item: ItemDetail }) {
 
 export function Workspace() {
   const params = useParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const id = Number(params.id);
   const { data: item, isPending } = useItem(id);
+  const filters: ItemFilters = {};
+  const status = StatusSchema.safeParse(searchParams.get('status'));
+  if (status.success) filters.status = status.data;
+  const personId = Number(searchParams.get('personId'));
+  if (Number.isInteger(personId) && personId > 0) filters.personId = personId;
+  const { data: items } = useItems(filters);
+  const itemIndex = items?.findIndex((candidate) => candidate.id === id) ?? -1;
+  const previousId = itemIndex > 0 ? items?.[itemIndex - 1]?.id : undefined;
+  const nextId = itemIndex >= 0 ? items?.[itemIndex + 1]?.id : undefined;
+
+  function openItem(nextItemId: number | undefined) {
+    if (nextItemId === undefined) return;
+    const search = searchParams.toString();
+    navigate({ pathname: `/items/${nextItemId}`, search });
+  }
 
   return (
     <section>
       <h2>Workspace</h2>
+      <nav className="item-navigation" aria-label="Library items">
+        <button type="button" disabled={previousId === undefined} onClick={() => openItem(previousId)}>
+          Previous
+        </button>
+        <span>
+          {itemIndex >= 0 && items ? `${itemIndex + 1} of ${items.length}` : 'Item position unavailable'}
+        </span>
+        <button type="button" disabled={nextId === undefined} onClick={() => openItem(nextId)}>
+          Next
+        </button>
+      </nav>
       {isPending && <p>Loading item…</p>}
-      {item && <WorkspaceContent key={item.id} item={item} />}
+      {item && <WorkspaceContent key={item.id} item={item} items={items ?? []} />}
     </section>
   );
 }

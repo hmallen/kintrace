@@ -11,7 +11,10 @@ describe('openDb', () => {
       .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
       .all()
       .map((r: any) => r.name);
-    for (const t of ['items', 'pages', 'people', 'item_people', 'events', 'gedcom_review_items']) {
+    for (const t of [
+      'items', 'pages', 'item_groups', 'item_group_members', 'people', 'item_people',
+      'events', 'gedcom_review_items', 'timeline_story',
+    ]) {
       expect(tables).toContain(t);
     }
   });
