@@ -1,103 +1,12 @@
 /*
- * Timeline precision + status encoding.
+ * Timeline styles: the Explore renderer, its controls, the table fallback,
+ * and the undated tray.
  *
- * vis-timeline stamps TimelineDatum.className ("precision-<p> status-<s>",
- * from toTimelineData) onto its .vis-item elements — for point items that
- * includes the companion .vis-dot element — so everything here composes with
- * vis-timeline's own classes.
- *
- * Hues come from the archival status tokens in theme.css, shared with the
- * status chips so the encoding reads the same everywhere.
+ * Precision + status encoding: each status class sets --kt-item-color (hues
+ * from theme.css, shared with the status chips) and each precision pairs its
+ * hue with a non-color cue — solid bar (exact), edge fade (month/year),
+ * diagonal hatch (decade) — plus the "c." date label on the card.
  */
-
-/* The axis itself sits on the desk; quiet warm rules. */
-.vis-timeline {
-  border-color: var(--kt-rule);
-  background: var(--kt-paper);
-  font-family: var(--kt-font-ui);
-}
-
-.vis-panel.vis-center,
-.vis-panel.vis-left,
-.vis-panel.vis-right,
-.vis-panel.vis-top,
-.vis-panel.vis-bottom {
-  border-color: var(--kt-rule);
-}
-
-.vis-time-axis .vis-text {
-  color: var(--kt-ink-soft);
-}
-
-.vis-time-axis .vis-grid.vis-minor,
-.vis-time-axis .vis-grid.vis-major {
-  border-color: color-mix(in srgb, var(--kt-rule) 60%, transparent);
-}
-
-/* ---- Status tints ------------------------------------------------------ */
-/* Each status sets the hue the precision shapes draw with, so status and
-   precision compose freely (any precision × any status). */
-
-.vis-item {
-  --kt-item-color: var(--kt-ink-soft); /* fallback if no status class present */
-  color: inherit;
-  font-size: 0.8rem;
-}
-
-.vis-item.status-pending {
-  --kt-item-color: var(--kt-status-pending); /* ochre — needs transcription */
-}
-
-.vis-item.status-transcribed {
-  --kt-item-color: var(--kt-status-transcribed); /* slate ink — unverified */
-}
-
-.vis-item.status-reviewed {
-  --kt-item-color: var(--kt-status-reviewed); /* bottle green — verified */
-}
-
-/* ---- Precision shapes -------------------------------------------------- */
-
-/* exact → point marker: a filled dot in the status hue (was a hollow ring —
-   too faint against the desk). */
-.vis-item.vis-dot.precision-exact {
-  border-color: var(--kt-item-color);
-  background: var(--kt-item-color);
-}
-
-.vis-item.vis-point.precision-exact {
-  background: transparent;
-  border: none;
-}
-
-/* month / year → range bar: solid ink center (label set in paper so it stays
-   legible on the fill), gradient-faded left/right edges expressing the fuzz. */
-.vis-item.vis-range.precision-month,
-.vis-item.vis-range.precision-year {
-  border: none;
-  border-radius: 3px;
-  color: var(--kt-paper);
-  background: linear-gradient(
-    to right,
-    transparent,
-    var(--kt-item-color) 14px,
-    var(--kt-item-color) calc(100% - 14px),
-    transparent
-  );
-}
-
-/* decade → diagonal-hatched translucent bar: reads as "somewhere in here". */
-.vis-item.vis-range.precision-decade {
-  border: 1px dashed color-mix(in srgb, var(--kt-item-color) 50%, transparent);
-  border-radius: 3px;
-  background: repeating-linear-gradient(
-    45deg,
-    color-mix(in srgb, var(--kt-item-color) 30%, transparent) 0,
-    color-mix(in srgb, var(--kt-item-color) 30%, transparent) 6px,
-    transparent 6px,
-    transparent 12px
-  );
-}
 
 /* ---- Undated tray ------------------------------------------------------ */
 
@@ -394,4 +303,126 @@
 .explore-focusable:focus-visible {
   outline: 3px solid var(--kt-accent);
   outline-offset: 2px;
+}
+
+/* ---- Controls bar ------------------------------------------------------ */
+
+.timeline-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.9rem;
+  margin: 0 0 1rem;
+}
+
+.control-group {
+  display: flex;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.control-group legend {
+  padding: 0 0 0.25rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--kt-ink-soft);
+}
+
+.control-toggle {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--kt-rule);
+  background: var(--kt-paper);
+  color: var(--kt-ink);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.control-toggle + .control-toggle {
+  border-left: none;
+}
+
+.control-toggle:first-of-type {
+  border-radius: var(--kt-radius) 0 0 var(--kt-radius);
+}
+
+.control-toggle:last-of-type {
+  border-radius: 0 var(--kt-radius) var(--kt-radius) 0;
+}
+
+.control-toggle[aria-pressed='true'] {
+  background: var(--kt-accent);
+  border-color: var(--kt-accent);
+  color: var(--kt-paper);
+}
+
+.control-toggle:hover:not([aria-pressed='true']) {
+  background: var(--kt-accent-wash);
+}
+
+.control-toggle:focus-visible,
+.control-person select:focus-visible {
+  outline: 3px solid var(--kt-accent);
+  outline-offset: 2px;
+}
+
+.control-person {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--kt-ink-soft);
+}
+
+.control-person select {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--kt-rule);
+  border-radius: var(--kt-radius);
+  background: var(--kt-paper);
+  color: var(--kt-ink);
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+/* ---- Table fallback ---------------------------------------------------- */
+
+.timeline-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--kt-paper);
+  border: 1px solid var(--kt-rule);
+}
+
+.timeline-table caption {
+  padding: 0.5rem;
+  font-style: italic;
+  color: var(--kt-ink-soft);
+  caption-side: top;
+  text-align: left;
+}
+
+.timeline-table th,
+.timeline-table td {
+  padding: 0.45rem 0.7rem;
+  border-bottom: 1px solid var(--kt-rule);
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.timeline-table th {
+  font-family: var(--kt-font-display);
+  letter-spacing: 0.04em;
+}
+
+.timeline-empty {
+  padding: 1.5rem;
+  border: 1px dashed var(--kt-rule);
+  border-radius: var(--kt-radius);
+  color: var(--kt-ink-soft);
+  background: color-mix(in srgb, var(--kt-paper) 55%, transparent);
 }
