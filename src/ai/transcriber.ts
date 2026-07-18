@@ -80,7 +80,7 @@ function findFirstJsonObject(text: string): unknown | null {
  * correctly handles stray braces in surrounding prose (e.g. "...the
  * {handwriting} style.") by tracking brace depth and skipping string literals.
  */
-function extractJsonObject(text: string): unknown {
+export function extractJsonObject(text: string): unknown {
   const fenceRegex = /```(?:json)?\n?([\s\S]*?)```/g;
   let fenceMatch: RegExpExecArray | null;
   while ((fenceMatch = fenceRegex.exec(text)) !== null) {

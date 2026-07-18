@@ -7,6 +7,13 @@ import { mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { importFile, type MediaType } from './importer.js';
+import {
+  classifyDocumentCropsLocally,
+  DocumentIngestionError,
+  isSupportedDocumentSheetFilename,
+  splitDocumentImage,
+  type DocumentTypeClassifier,
+} from './document-ingestion.js';
 import { processPendingItems } from './ai/queue.js';
 import { normalizeFuzzyDate } from './dates.js';
 import type { TranscriptionEngine } from './ai/engine.js';
@@ -56,6 +63,7 @@ export interface ServerDeps {
   gedcomArchiveDir?: string;
   gedcomMaxBytes?: number;
   engine: TranscriptionEngine | null;
+  documentTypeClassifier?: DocumentTypeClassifier | null;
   aiDisabledMessage?: string;
   storyGenerator?: StoryGenerator | null;
 }
@@ -555,6 +563,105 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       return results;
     } finally {
       await Promise.all(staged.map(({ stagedPath }) => rm(stagedPath, { force: true })));
+    }
+  });
+
+  app.post('/api/document-sheets/ingest', async (req, reply) => {
+    if (!(req as { isMultipart?: () => boolean }).isMultipart?.()) {
+      return reply.code(400).send({ error: 'Document-sheet ingestion requires exactly one image file' });
+    }
+
+    await mkdir(deps.stagingDir, { recursive: true });
+    const staged: { filename: string; stagedPath: string }[] = [];
+    const workDir = path.join(deps.stagingDir, `document-sheet-${randomBytes(8).toString('hex')}`);
+    try {
+      for await (const part of req.parts()) {
+        if (part.type !== 'file') continue;
+        const stagedPath = path.join(
+          deps.stagingDir,
+          `${randomBytes(8).toString('hex')}-${path.basename(part.filename)}`,
+        );
+        staged.push({ filename: part.filename, stagedPath });
+        await pipeline(part.file, fs.createWriteStream(stagedPath));
+      }
+      if (staged.length !== 1) {
+        reply.code(400);
+        return { error: 'Document-sheet ingestion requires exactly one image file' };
+      }
+      if (!isSupportedDocumentSheetFilename(staged[0]!.filename)) {
+        reply.code(415);
+        return {
+          error: 'Document-sheet ingestion accepts JPG, PNG, TIFF, or WebP images',
+        };
+      }
+
+      await mkdir(workDir, { recursive: true });
+      try {
+        const crops = await splitDocumentImage(
+          staged[0]!.stagedPath,
+          workDir,
+          staged[0]!.filename,
+        );
+        const images = await Promise.all(crops.map((crop) => fs.promises.readFile(crop.path)));
+        let mediaTypes: MediaType[];
+        let typeDetection: 'vision' | 'local' = 'local';
+        let warning: string | null = null;
+        if (deps.documentTypeClassifier) {
+          try {
+            mediaTypes = await deps.documentTypeClassifier.classify(images);
+            if (mediaTypes.length !== crops.length) {
+              throw new Error('The classifier returned an unexpected number of results');
+            }
+            typeDetection = 'vision';
+          } catch {
+            mediaTypes = await classifyDocumentCropsLocally(crops);
+            warning = 'AI type detection failed, so KinTrace used local visual estimates. Review each type before processing.';
+          }
+        } else {
+          mediaTypes = await classifyDocumentCropsLocally(crops);
+          warning = 'AI type detection is unavailable, so KinTrace used local visual estimates. Review each type before processing.';
+        }
+
+        const results = [];
+        for (let index = 0; index < crops.length; index++) {
+          const crop = crops[index]!;
+          try {
+            const mediaType = mediaTypes[index]!;
+            const imported = await importFile(deps.db, crop.path, {
+              archiveDir: deps.archiveDir,
+              cacheDir: deps.cacheDir,
+              mediaType,
+              originalFilename: crop.filename,
+            });
+            const item = db.prepare('SELECT media_type, status FROM items WHERE id = ?').get(imported.itemId) as {
+              media_type: MediaType;
+              status: 'pending' | 'transcribed' | 'reviewed';
+            };
+            results.push({
+              path: crop.filename,
+              ...imported,
+              mediaType: item.media_type,
+              status: item.status,
+              autoSelected: item.media_type === mediaType,
+            });
+          } catch (error) {
+            results.push({
+              path: crop.filename,
+              error: error instanceof Error ? error.message : 'Import failed',
+            });
+          }
+        }
+        return { results, detectedCount: crops.length, typeDetection, warning };
+      } catch (error) {
+        if (error instanceof DocumentIngestionError) {
+          reply.code(error.statusCode);
+          return { error: error.message };
+        }
+        throw error;
+      }
+    } finally {
+      await Promise.all(staged.map(({ stagedPath }) => rm(stagedPath, { force: true })));
+      await rm(workDir, { recursive: true, force: true });
     }
   });
 

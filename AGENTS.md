@@ -20,11 +20,13 @@ KinTrace is a Fastify + better-sqlite3 backend that imports archival media, runs
 - `src/db.ts` — SQLite schema and `openDb()`.
 - `src/dates.ts` — fuzzy date normalization (exact/month/year/decade/unknown precision, range expansion).
 - `src/importer.ts` — file hashing, dedupe, archiving, and thumbnail generation.
+- `src/document-ingestion.ts` — local background/region detection for overhead photographs containing many separated documents, full-resolution crop generation, conservative offline type estimation, and the optional `DocumentTypeClassifier` vision seam.
 - `src/ai/transcriber.ts` — `VisionClient` seam plus the two-pass HTR prompts and zod schemas: pass 1 drafts a diplomatic transcription (line breaks/spelling preserved, mandatory `[illegible]`/`[?]`/`[possibly Name]` uncertainty markers) and a normalized (modernized, search-friendly) one; pass 2 re-checks the draft against the image, corrects it, and emits a confidence report (`overall` high/medium/low, `summary`, `flaggedSpans[{text,reason}]`).
 - `src/ai/providers.ts` — `VisionClient` implementations (`createOpenAIVisionClient`, `createAnthropicVisionClient`) and `resolveProvider` (config-driven selection, no failover).
 - `src/ai/engine.ts` — `TranscriptionEngine` abstraction; `createLlmVisionEngine` composes the two passes. Queue/server depend on the engine, never a raw client (future seam for Tesseract/Transkribus-style engines routed by media type).
 - `src/ai/queue.ts` — resumable processor for `pending` items; persists both transcriptions plus `ai_confidence` JSON.
 - `src/server.ts` — Fastify route factory (`buildServer`); `GET /api/items/:id` returns `ai_confidence` parsed, `PATCH` lets reviewers edit both transcriptions.
+- `POST /api/document-sheets/ingest` accepts exactly one JPG/PNG/TIFF/WebP sheet, creates individual pending library items from detected regions, and cleans up both the source sheet and temporary crops after immutable archive copies are made.
 - `src/main.ts` — wires the above together and starts listening.
 
 Key invariants: archive originals are never modified after import; item status moves `pending` → `transcribed` → `reviewed` and never backwards automatically (a failed second pass records `ai_error` and leaves the item `pending`); AI responses from both passes are always zod-validated before being trusted; tests inject a fake `VisionClient` (or the fake OpenAI SDK seam) and never call a real OpenAI or Anthropic API.

@@ -99,4 +99,21 @@ describe('Import', () => {
     expect(screen.getByRole('button', { name: /Queue GEDCOM for review/i })).toBeDisabled();
     expect(screen.queryByRole('combobox', { name: /type to use|type for every/i })).not.toBeInTheDocument();
   });
+
+  it('offers a large-photo document splitting workflow', async () => {
+    const user = userEvent.setup();
+    renderImport();
+
+    await user.click(screen.getByRole('radio', { name: /photograph of many documents/i }));
+
+    expect(screen.getByRole('heading', { name: /split one overhead photograph/i })).toBeInTheDocument();
+    expect(screen.getByText(/plain surface that contrasts with their edges/i)).toBeInTheDocument();
+    const input = screen.getByLabelText(/large document photograph/i);
+    const submit = screen.getByRole('button', { name: /split and import documents/i });
+    expect(submit).toBeDisabled();
+
+    await user.upload(input, new File(['image'], 'desk.jpg', { type: 'image/jpeg' }));
+    expect(submit).toBeEnabled();
+    expect(screen.queryByRole('combobox', { name: /type to use|type for every/i })).not.toBeInTheDocument();
+  });
 });

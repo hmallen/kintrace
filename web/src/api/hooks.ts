@@ -20,6 +20,7 @@ import {
   ItemGroupSuggestionSchema,
   QueueResultSchema,
   TimelineStoryStateSchema,
+  DocumentSheetIngestResultSchema,
 } from '@shared/api.js';
 import type {
   ItemSummary,
@@ -45,6 +46,7 @@ import type {
   QueueResult,
   Status,
   TimelineStoryState,
+  DocumentSheetIngestResult,
 } from '@shared/api.js';
 import { ApiError, apiFetch, apiSend } from './client';
 import { useQueueStore } from '../stores/queue';
@@ -394,6 +396,27 @@ export function useImportGedcom(): UseMutationResult<GedcomImportResult, ApiErro
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['gedcom-review'] });
+    },
+  });
+}
+
+export function useIngestDocumentSheet(): UseMutationResult<
+  DocumentSheetIngestResult,
+  ApiError,
+  File
+> {
+  const queryClient = useQueryClient();
+  return useMutation<DocumentSheetIngestResult, ApiError, File>({
+    mutationFn: (file) => {
+      const form = new FormData();
+      form.append('file', file);
+      return apiFetch('/api/document-sheets/ingest', DocumentSheetIngestResultSchema, {
+        method: 'POST',
+        body: form,
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['items'] });
     },
   });
 }

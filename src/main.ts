@@ -9,6 +9,11 @@ import {
 } from './ai/providers.js';
 import { createLlmVisionEngine, type TranscriptionEngine } from './ai/engine.js';
 import { createOpenAIStoryModelClient, createStoryGenerator } from './ai/story.js';
+import { installProcessLifecycle } from './process-lifecycle.js';
+import {
+  createVisionDocumentTypeClassifier,
+  type DocumentTypeClassifier,
+} from './document-ingestion.js';
 
 const dataDir = process.env.KINTRACE_DATA ?? join(process.cwd(), 'data');
 const archiveDir = join(dataDir, 'archive');
@@ -23,6 +28,7 @@ mkdirSync(gedcomArchiveDir, { recursive: true });
 const db = openDb(join(dataDir, 'kintrace.db'));
 const choice = resolveProvider(process.env);
 let engine: TranscriptionEngine | null = null;
+let documentTypeClassifier: DocumentTypeClassifier | null = null;
 let aiDisabledMessage: string | undefined;
 if (choice.ok) {
   const client =
@@ -30,6 +36,7 @@ if (choice.ok) {
       ? createOpenAIVisionClient(choice.apiKey, { model: process.env.OPENAI_VISION_MODEL })
       : createAnthropicVisionClient(choice.apiKey);
   engine = createLlmVisionEngine(client);
+  documentTypeClassifier = createVisionDocumentTypeClassifier(client);
 } else {
   aiDisabledMessage = choice.message;
   console.warn(choice.message);
@@ -50,13 +57,18 @@ const app = buildServer({
   stagingDir,
   gedcomArchiveDir,
   engine,
+  documentTypeClassifier,
   aiDisabledMessage,
   storyGenerator,
 });
 const port = Number(process.env.PORT ?? 3271);
+const lifecycle = installProcessLifecycle({
+  closeServer: () => app.close(),
+  closeDatabase: () => db.close(),
+});
 app.listen({ port, host: '127.0.0.1' }).then(() => {
   console.log(`KinTrace API on http://127.0.0.1:${port}`);
 }).catch((err) => {
   console.error(`Failed to start KinTrace API on port ${port}:`, err.message ?? err);
-  process.exit(1);
+  void lifecycle.shutdown('startup failure', 1);
 });

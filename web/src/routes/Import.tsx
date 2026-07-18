@@ -4,10 +4,16 @@ import Uppy from '@uppy/core';
 import XHRUpload from '@uppy/xhr-upload';
 import Dashboard from '@uppy/react/dashboard';
 import { ImportResultSchema, MediaTypeSchema } from '@shared/api.js';
-import type { GedcomImportResult, ImportResult, MediaType } from '@shared/api.js';
+import type {
+  DocumentSheetIngestResult,
+  GedcomImportResult,
+  ImportResult,
+  MediaType,
+} from '@shared/api.js';
 import { API_BASE } from '../api/client';
 import { useUpdateItem } from '../api/hooks';
 import { useImportGedcom } from '../api/hooks';
+import { useIngestDocumentSheet } from '../api/hooks';
 import { summarizeImport } from '../import/summarize';
 import '@uppy/core/css/style.min.css';
 import '@uppy/dashboard/css/style.min.css';
@@ -171,14 +177,17 @@ export function GedcomImportResults({ result }: { result: GedcomImportResult | n
 }
 
 export function Import() {
-  const [mode, setMode] = useState<'media' | 'gedcom'>('media');
+  const [mode, setMode] = useState<'media' | 'document-sheet' | 'gedcom'>('media');
   const [mediaType, setMediaType] = useState<MediaType>('pdf');
   const [autoDetect, setAutoDetect] = useState(true);
   const [results, setResults] = useState<ImportResult[]>([]);
   const [gedcomFile, setGedcomFile] = useState<File | null>(null);
   const [gedcomResult, setGedcomResult] = useState<GedcomImportResult | null>(null);
+  const [documentSheetFile, setDocumentSheetFile] = useState<File | null>(null);
+  const [documentSheetResult, setDocumentSheetResult] = useState<DocumentSheetIngestResult | null>(null);
   const [responseError, setResponseError] = useState<string | null>(null);
   const importGedcom = useImportGedcom();
+  const ingestDocumentSheet = useIngestDocumentSheet();
 
   // The Uppy instance is created in an effect (not a useState initializer) so
   // StrictMode's mount/unmount/mount cycle never renders the Dashboard against
@@ -225,7 +234,7 @@ export function Import() {
   return (
     <section>
       <h2>Import</h2>
-      <div className="import-controls">
+      <div className="import-controls import-mode-controls">
         <label>
           <input
             type="radio"
@@ -234,6 +243,15 @@ export function Import() {
             onChange={() => setMode('media')}
           />{' '}
           Archival media
+        </label>{' '}
+        <label>
+          <input
+            type="radio"
+            name="import-mode"
+            checked={mode === 'document-sheet'}
+            onChange={() => setMode('document-sheet')}
+          />{' '}
+          Photograph of many documents
         </label>{' '}
         <label>
           <input
@@ -303,6 +321,60 @@ export function Import() {
             Queue GEDCOM for review
           </button>
           <GedcomImportResults result={gedcomResult} />
+        </form>
+      )}
+      {mode === 'document-sheet' && (
+        <form
+          className="document-sheet-import"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (documentSheetFile === null) return;
+            setResponseError(null);
+            setDocumentSheetResult(null);
+            try {
+              setDocumentSheetResult(await ingestDocumentSheet.mutateAsync(documentSheetFile));
+            } catch (error) {
+              setResponseError(error instanceof Error ? error.message : 'Failed to split the document photograph.');
+            }
+          }}
+        >
+          <div className="document-sheet-guidance">
+            <h3>Split one overhead photograph into library items</h3>
+            <p>
+              Arrange documents with visible gaps on a plain surface that contrasts with their edges.
+              KinTrace finds each region, saves a full-resolution crop, and estimates whether it is a
+              photo, letter, article, or general document.
+            </p>
+            <p>The source photograph is temporary. Only the individual crops enter the library.</p>
+          </div>
+          <label>
+            Large document photograph{' '}
+            <input
+              type="file"
+              accept=".jpg,.jpeg,.png,.tif,.tiff,.webp,image/jpeg,image/png,image/tiff,image/webp"
+              onChange={(event) => {
+                setDocumentSheetFile(event.currentTarget.files?.[0] ?? null);
+                setDocumentSheetResult(null);
+              }}
+            />
+          </label>{' '}
+          <button
+            type="submit"
+            disabled={documentSheetFile === null || ingestDocumentSheet.isPending}
+          >
+            {ingestDocumentSheet.isPending ? 'Finding documents…' : 'Split and import documents'}
+          </button>
+          {documentSheetResult && (
+            <>
+              <p>
+                Found {documentSheetResult.detectedCount}{' '}
+                {documentSheetResult.detectedCount === 1 ? 'document' : 'documents'}.
+                Review each automatically selected type before processing.
+              </p>
+              {documentSheetResult.warning && <p role="status">{documentSheetResult.warning}</p>}
+              <ImportResults results={documentSheetResult.results} />
+            </>
+          )}
         </form>
       )}
       {responseError && <p role="alert">{responseError}</p>}

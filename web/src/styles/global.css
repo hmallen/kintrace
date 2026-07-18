@@ -713,6 +713,41 @@ label {
   margin-bottom: 1rem;
 }
 
+.import-mode-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 1.25rem;
+}
+
+.import-mode-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.import-mode-controls input {
+  flex: none;
+  margin: 0;
+}
+
+.document-sheet-import {
+  display: grid;
+  gap: 1rem;
+  max-width: 58rem;
+}
+
+.document-sheet-guidance {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--kt-rule);
+  background: var(--kt-paper);
+  box-shadow: var(--kt-shadow-card);
+}
+
+.document-sheet-guidance h3,
+.document-sheet-guidance p:last-child {
+  margin-bottom: 0;
+}
+
 .media-type-implications {
   max-width: 58rem;
   margin: 0 0 1rem;

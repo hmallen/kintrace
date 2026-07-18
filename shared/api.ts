@@ -212,6 +212,14 @@ export const ImportResultSchema = z.union([
 ]);
 export type ImportResult = z.infer<typeof ImportResultSchema>;
 
+export const DocumentSheetIngestResultSchema = z.object({
+  results: z.array(ImportResultSchema),
+  detectedCount: z.number().int().nonnegative(),
+  typeDetection: z.enum(['vision', 'local']),
+  warning: z.string().nullable(),
+});
+export type DocumentSheetIngestResult = z.infer<typeof DocumentSheetIngestResultSchema>;
+
 export const QueueResultSchema = z.object({ processed: z.number(), failed: z.number() });
 export type QueueResult = z.infer<typeof QueueResultSchema>;
 

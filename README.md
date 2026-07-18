@@ -126,11 +126,17 @@ npm run build
 
 1. Start the backend with `npm run dev`.
 2. Start the frontend with `cd web && npm run dev`.
-3. Use the Import view to upload files and choose a media type: `photo`, `letter`, `article`, `audio`, `video`, or `pdf`.
+3. Use the Import view to upload files and choose a media type: `photo`, `letter`, `article`, `audio`, `video`, or `pdf`. For one overhead photograph containing many separated documents, choose **Photograph of many documents** instead; KinTrace detects each region and imports it as an individual item.
 4. Imported originals are copied into the archive under `KINTRACE_DATA` or `./data`; originals are not modified.
 5. Use the Library and Workspace views to browse items, inspect media, edit metadata, review transcriptions, and mark completed items as reviewed.
 6. Use the People view to add people, then associate them with items as subjects, authors, or recipients.
 7. Use the Timeline view to see dated and undated items.
+
+### Ingesting a photograph of many documents
+
+The document-sheet tool accepts one large JPG, PNG, TIFF, or WebP image. Arrange the source items on a plain surface with visible gaps and enough contrast around every edge. KinTrace analyzes a downscaled copy to find regions, then makes each archival crop from the full-resolution source image. The source sheet remains temporary and is removed after ingestion; only the individual crops are copied into the immutable archive.
+
+When an AI vision provider is configured, KinTrace attempts to classify every crop as a photograph, letter, article, or general document. Without a provider—or if classification fails—it uses a conservative local visual estimate (`photo` or `pdf`). Every imported crop remains `pending`, and its automatically selected type can be corrected in the result preview before queue processing.
 
 ## Timeline UI
 
@@ -182,6 +188,7 @@ Key backend endpoints:
 - `POST /api/people` - create a person.
 - `POST /api/import` - import files by local path.
 - `POST /api/upload` - upload and import files via multipart form data.
+- `POST /api/document-sheets/ingest` - split one overhead document photograph and import its detected regions as individual pending items.
 - `POST /api/queue/process` - process pending items with the configured AI provider.
 
 ## Development Notes
